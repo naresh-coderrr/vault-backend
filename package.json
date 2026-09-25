@@ -13,12 +13,14 @@
     "register-nodes": "node scripts/register-nodes.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.18.3",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.7.0",
+    "pg": "^8.23.0",
     "socket.io": "^4.7.4",
     "uuid": "^9.0.1"
   },
