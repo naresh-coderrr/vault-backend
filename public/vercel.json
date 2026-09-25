@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/files", "destination": "/files.html" },
+    { "source": "/cluster", "destination": "/cluster.html" },
+    { "source": "/chaos", "destination": "/chaos.html" },
+    { "source": "/settings", "destination": "/settings.html" }
+  ]
+}

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chaos Engineering Studio — Vault Distributed Storage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="vault-storage.js"></script>
+  <style>
+    :root {
+      --primary: #FF6B35;
+      --primary-hover: #E85A24;
+      --secondary: #8B5CF6;
+      --accent: #EC4899;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --info: #3B82F6;
+
+      --bg: #0D1117;
+      --bg-card: rgba(22, 27, 34, 0.85);
+      --bg-card-hover: rgba(30, 37, 48, 0.95);
+      --surface: #161B22;
+      --surface-border: rgba(255, 107, 53, 0.18);
+      --surface-border-hover: rgba(239, 68, 68, 0.35);
+      --text: #F0F6FC;
+      --text-muted: #8B949E;
+      --text-dim: #6B7280;
+      --glass: rgba(18, 21, 31, 0.75);
+      --glass-blur: blur(24px);
+      --gradient-brand: linear-gradient(135deg, #FF6B35 0%, #F59E0B 50%, #8B5CF6 100%);
+      --shadow-card: 0 14px 40px -6px rgba(0, 0, 0, 0.45);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --sidebar-w: 260px;
+      --font: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg: #F4F6F8;
+      --bg-card: rgba(255, 255, 255, 0.95);
+      --surface: #FFFFFF;
+      --surface-border: rgba(255, 107, 53, 0.2);
+      --text: #1F2937;
+      --text-muted: #6B7280;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    .ambient-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+    .orb { position: absolute; border-radius: 50%; filter: blur(140px); opacity: 0.25; }
+    .orb-1 { width: 500px; height: 500px; background: #EF4444; top: -100px; left: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: #FF6B35; bottom: -100px; right: -100px; }
+
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--glass);
+      backdrop-filter: var(--glass-blur);
+      border-right: 1px solid var(--surface-border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 100;
+      padding: 24px 18px;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 32px;
+      padding-left: 6px;
+    }
+    .brand-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--gradient-brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+    }
+    .brand-title { font-size: 20px; font-weight: 800; }
+
+    .nav-list { list-style: none; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    .nav-item a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .nav-item.active a {
+      color: #FFFFFF;
+      background: var(--gradient-brand);
+      box-shadow: 0 4px 20px rgba(255, 107, 53, 0.35);
+    }
+
+    /* Centered Main Content */
+    .main-wrapper {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 32px 40px 60px;
+      max-width: 1400px;
+      margin-right: auto;
+    }
+
+    .chaos-banner {
+      background: linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(255,107,53,0.15) 100%);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chaos-badge {
+      font-size: 12px; font-weight: 800;
+      background: rgba(239,68,68,0.2); color: var(--danger);
+      padding: 4px 10px; border-radius: 99px;
+      border: 1px solid rgba(239,68,68,0.4);
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: 10px;
+      font-family: var(--font); font-weight: 700; font-size: 14px;
+      border: 1px solid transparent; cursor: pointer; text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .btn-danger { background: rgba(239,68,68,0.2); color: var(--danger); border-color: rgba(239,68,68,0.4); }
+    .btn-danger:hover { background: var(--danger); color: #FFFFFF; }
+    .btn-secondary { background: var(--bg-card); color: var(--text); border-color: var(--surface-border); }
+    .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--surface-border-hover); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+
+    /* Grid */
+    .chaos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+    }
+    .panel-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+
+    .node-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px; background: rgba(0,0,0,0.2); border-radius: 10px;
+      margin-bottom: 10px; border: 1px solid var(--surface-border);
+    }
+    .node-status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--success); box-shadow: 0 0 8px var(--success);
+    }
+    .node-status-dot.dead { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 10px 14px;
+      border-radius: 8px; border: 1px solid var(--surface-border);
+      background: var(--surface); color: var(--text);
+      font-family: var(--font); font-size: 13px; outline: none;
+    }
+    .form-input:focus { border-color: var(--primary); }
+
+    .healing-log-box {
+      background: #06090E; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-md); padding: 18px;
+      font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+      height: 320px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .log-entry {
+      display: flex; gap: 10px; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .log-time { color: var(--text-dim); }
+    .log-msg.err { color: var(--danger); }
+    .log-msg.ok { color: var(--success); }
+    .log-msg.warn { color: var(--warning); }
+    .log-msg.info { color: var(--secondary); }
+
+    .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+    .toast {
+      background: var(--surface); border: 1px solid var(--surface-border);
+      border-radius: 10px; padding: 14px 20px; color: var(--text);
+      font-size: 14px; box-shadow: var(--shadow-card);
+      display: flex; align-items: center; gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <a href="index.html" class="sidebar-brand">
+      <div class="brand-icon">🛡️</div>
+      <div class="brand-title">Vault</div>
+    </a>
+
+    <ul class="nav-list">
+      <li class="nav-item"><a href="dashboard.html">📊 Dashboard</a></li>
+      <li class="nav-item"><a href="files.html">📁 File Manager</a></li>
+      <li class="nav-item"><a href="cluster.html">🖥️ Cluster Health</a></li>
+      <li class="nav-item active"><a href="chaos.html">⚡ Chaos Lab</a></li>
+      <li class="nav-item"><a href="settings.html">⚙️ Settings</a></li>
+    </ul>
+  </aside>
+
+  <!-- Centered Main Content -->
+  <main class="main-wrapper">
+    <div class="chaos-banner">
+      <div>
+        <span class="chaos-badge">⚡ Safe Simulation Studio</span>
+        <h2 style="font-size: 20px; font-weight: 800; margin: 8px 0 4px;">Disaster Recovery & Chaos Injection Lab</h2>
+        <p style="font-size: 13px; color: var(--text-muted);">Test node crashes, partial network partitions, and on-disk bit rot. Observe sub-second auto-repair.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="restoreAll()">🔄 Restore All Nodes</button>
+    </div>
+
+    <div class="chaos-grid">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title"><span>☠️</span> Storage Node Fault Injection</div>
+          </div>
+
+          <div class="node-row" id="rowNode1">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="node-status-dot" id="dot1"></div>
+              <div>
+                <strong style="font-size: 14px;">Node Alpha</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">Port: 9001 · 28 Chunks</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm btn-danger" id="btnKill1" onclick="killNode(1, 'Node Alpha')">☠️ Kill Node</button>
+              <button class="btn btn-sm btn-secondary" onclick="injectLatency(1, 'Node Alpha')">⏱️ +2000ms</button>
+            </div>
+          </div>
+
+          <div class="node-row" id="rowNode2">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="node-status-dot" id="dot2"></div>
+              <div>
+                <strong style="font-size: 14px;">Node Beta</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">Port: 9002 · 28 Chunks</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm btn-danger" id="btnKill2" onclick="killNode(2, 'Node Beta')">☠️ Kill Node</button>
+              <button class="btn btn-sm btn-secondary" onclick="injectLatency(2, 'Node Beta')">⏱️ +2000ms</button>
+            </div>
+          </div>
+
+          <div class="node-row" id="rowNode3">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="node-status-dot" id="dot3"></div>
+              <div>
+                <strong style="font-size: 14px;">Node Gamma</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">Port: 9003 · 27 Chunks</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm btn-danger" id="btnKill3" onclick="killNode(3, 'Node Gamma')">☠️ Kill Node</button>
+              <button class="btn btn-sm btn-secondary" onclick="injectLatency(3, 'Node Gamma')">⏱️ +2000ms</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title"><span>🧪</span> Bit-Rot Corruption Injector</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Target Stored Object</label>
+            <select class="form-input" id="corruptFileSelect">
+              <option>cloud_security_audit_report.pdf</option>
+              <option>system_architecture_manifest.json</option>
+              <option>financial_ledger_2025.zip</option>
+            </select>
+          </div>
+          <button class="btn btn-danger" style="width: 100%;" onclick="injectBitRot()">Corrupt Chunk #1 on Node Beta</button>
+        </div>
+      </div>
+
+      <!-- Right Column: Real-Time Healing Stream -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><span>📡</span> Autonomous Self-Healing Log Stream</div>
+          <button class="btn btn-sm btn-secondary" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="healing-log-box" id="healingLog">
+          <div class="log-entry"><span class="log-time">[00:00:01]</span><span class="log-msg info">Scrubber daemon online. 9/9 nodes responding OK.</span></div>
+          <div class="log-entry"><span class="log-time">[00:00:04]</span><span class="log-msg ok">Quorum replication factor verified across active cluster.</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    function showToast(msg, type = 'info') {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.innerHTML = `<span>${type === 'success' ? '✅' : type === 'danger' ? '⚠️' : 'ℹ️'}</span> <span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateY(10px)';
+        t.style.transition = 'all 0.3s';
+        setTimeout(() => t.remove(), 300);
+      }, 3500);
+    }
+
+    function appendLog(msg, type = 'info') {
+      const log = document.getElementById('healingLog');
+      const d = new Date();
+      const time = `[${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}]`;
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function killNode(num, name) {
+      document.getElementById(`dot${num}`).className = 'node-status-dot dead';
+      const btn = document.getElementById(`btnKill${num}`);
+      btn.textContent = '🔄 Revive Node';
+      btn.className = 'btn btn-sm btn-secondary';
+      btn.onclick = () => reviveNode(num, name);
+
+      showToast(`☠️ ${name} simulated CRASH! Heartbeat missed.`, 'danger');
+      appendLog(`[ALERT] Heartbeat lost for ${name} (:900${num})`, 'err');
+      appendLog(`[HEALER] Under-replicated chunks identified. Spawning worker...`, 'warn');
+
+      setTimeout(() => {
+        appendLog(`[HEALER] Fetching source chunk from surviving healthy node...`, 'info');
+      }, 800);
+
+      setTimeout(() => {
+        appendLog(`[HEALER] Replicated missing shards to surviving peer. Quorum restored!`, 'ok');
+        showToast(`✅ Autonomous Healer recovered all chunks of ${name} on surviving peers!`, 'success');
+      }, 1600);
+    }
+
+    function reviveNode(num, name) {
+      document.getElementById(`dot${num}`).className = 'node-status-dot';
+      const btn = document.getElementById(`btnKill${num}`);
+      btn.textContent = '☠️ Kill Node';
+      btn.className = 'btn btn-sm btn-danger';
+      btn.onclick = () => killNode(num, name);
+
+      showToast(`✅ ${name} reconnected & verified by Scrubber!`, 'success');
+      appendLog(`[SYSTEM] ${name} back online. Scrubber verified block checksums.`, 'ok');
+    }
+
+    function injectLatency(num, name) {
+      showToast(`⏱️ Injected 2000ms synthetic latency into ${name}.`, 'warning');
+      appendLog(`[CHAOS] Synthetic latency of 2000ms applied to ${name}`, 'warn');
+    }
+
+    function injectBitRot() {
+      const file = document.getElementById('corruptFileSelect').value;
+      showToast(`Corrupted chunk #1 checksum for "${file}". Scrubber detecting...`, 'danger');
+      appendLog(`[CORRUPTION] Bit-flip injected into Chunk #1 of ${file}`, 'err');
+      setTimeout(() => {
+        appendLog(`[SCRUBBER] SHA-256 mismatch detected on Node Beta for ${file}`, 'warn');
+        appendLog(`[HEALER] Corrupted chunk discarded. Clean replica pulled from Node Alpha.`, 'ok');
+        showToast(`✅ Anti-Bit-Rot Scrubber repaired "${file}" seamlessly!`, 'success');
+      }, 1000);
+    }
+
+    function restoreAll() {
+      [1, 2, 3].forEach(i => {
+        document.getElementById(`dot${i}`).className = 'node-status-dot';
+        const btn = document.getElementById(`btnKill${i}`);
+        btn.textContent = '☠️ Kill Node';
+        btn.className = 'btn btn-sm btn-danger';
+        const name = i === 1 ? 'Node Alpha' : i === 2 ? 'Node Beta' : 'Node Gamma';
+        btn.onclick = () => killNode(i, name);
+      });
+      appendLog('[SYSTEM] All nodes restored to HEALTHY state.', 'ok');
+      showToast('All cluster storage nodes healthy & operational!', 'success');
+    }
+
+    function clearLog() {
+      document.getElementById('healingLog').innerHTML = '';
+      appendLog('Healing log stream reset.', 'info');
+    }
+  </script>
+</body>
+</html>

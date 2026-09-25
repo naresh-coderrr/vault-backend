@@ -1,0 +1,31 @@
+{
+  "name": "Vault Cloud Storage & Drive",
+  "short_name": "Vault Drive",
+  "description": "Fault-tolerant distributed object storage platform with real-time health telemetry and zero data loss.",
+  "start_url": "/dashboard.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1117",
+  "theme_color": "#FF6B35",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23FF6B35'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>🛡️</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "File Manager",
+      "url": "/files.html",
+      "description": "Browse and upload files"
+    },
+    {
+      "name": "Cluster Health",
+      "url": "/cluster.html",
+      "description": "Inspect storage node health"
+    }
+  ]
+}
