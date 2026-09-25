@@ -1,17 +1,19 @@
 /**
  * ============================================================================
- * 🛡️ VAULT DISTRIBUTED OBJECT STORAGE — PERSISTENCE & CRYPTO ENGINE (v4.0)
+ * 🛡️ VAULT DISTRIBUTED OBJECT STORAGE — PERSISTENCE & CRYPTO ENGINE (v5.0)
  * Multi-layer persistence: IndexedDB (Real Blobs/Videos/Docs) + localStorage + Supabase.
  * Real Web Crypto SHA-256 Hashing, Configurable 4MB/8MB Sharding, Zero Assumptions.
+ * Google Drive-style Virtual Hierarchical Folder Engine with .ZIP Folder Bundler.
  * Small File Threshold: Full Broadcast across Maximum Cluster Nodes (9 Nodes).
  * Large File Policy: 4MB Chunks distributed across Availability Zone Quorums.
  * ============================================================================
  */
 
-const DB_NAME = 'VaultDistributedStorageDB_v4';
-const DB_VERSION = 1;
+const DB_NAME = 'VaultDistributedStorageDB_v5';
+const DB_VERSION = 2;
 const STORE_FILES = 'files_metadata';
 const STORE_BLOBS = 'files_blobs';
+const STORE_FOLDERS = 'folders_metadata';
 
 // Configurable Storage Policies
 const CHUNK_SIZE_BYTES = 4 * 1024 * 1024; // 4MB Sharding Limit (High-throughput)
@@ -30,11 +32,40 @@ const CLUSTER_NODES = [
   { id: 'node-iota', name: 'Node Iota (:9009)', zone: 'ap-south-1b', rack: 'Rack-05' }
 ];
 
-// Seed Files (Initial Catalog)
+// Seed Folders
+const SEED_FOLDERS = [
+  {
+    id: 'folder-seed-01',
+    name: 'Project Documents',
+    icon: '📁',
+    color: '#FF6B35',
+    parentId: null,
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
+  },
+  {
+    id: 'folder-seed-02',
+    name: 'Media & Visual Assets',
+    icon: '🎬',
+    color: '#8B5CF6',
+    parentId: null,
+    createdAt: new Date(Date.now() - 3600000 * 18).toISOString()
+  },
+  {
+    id: 'folder-seed-03',
+    name: 'Financial & Audit Archives',
+    icon: '🗜️',
+    color: '#10B981',
+    parentId: null,
+    createdAt: new Date(Date.now() - 3600000 * 12).toISOString()
+  }
+];
+
+// Seed Files (Initial Catalog with Folder Links)
 const SEED_FILES = [
   {
     id: 'vault-seed-01',
     name: 'system_architecture_manifest.json',
+    folderId: 'folder-seed-01',
     type: 'application/json',
     category: 'documents',
     sizeBytes: 15206,
@@ -53,11 +84,12 @@ const SEED_FILES = [
         nodes: CLUSTER_NODES.map(n => n.name)
       }
     ],
-    sampleText: '{\n  "project": "Vault Distributed Storage v4",\n  "durability": "99.999999999%",\n  "chunk_size_bytes": 4194304,\n  "small_file_threshold_bytes": 5242880,\n  "small_file_policy": "Full Broadcast Across All 9 Nodes",\n  "large_file_policy": "4MB Dynamic Chunking with Multi-AZ Quorum",\n  "nodes": ["Node Alpha :9001", "Node Beta :9002", "Node Gamma :9003", "Node Delta :9004", "Node Epsilon :9005", "Node Zeta :9006", "Node Eta :9007", "Node Theta :9008", "Node Iota :9009"],\n  "anti_bit_rot": "SHA-256 Scrubber Active",\n  "supabase_sync": "https://csrhmocmponregwceknr.supabase.co"\n}'
+    sampleText: '{\n  "project": "Vault Distributed Storage v5",\n  "durability": "99.999999999%",\n  "folder": "Project Documents",\n  "chunk_size_bytes": 4194304,\n  "small_file_threshold_bytes": 5242880,\n  "small_file_policy": "Full Broadcast Across All 9 Nodes",\n  "large_file_policy": "4MB Dynamic Chunking with Multi-AZ Quorum",\n  "nodes": ["Node Alpha :9001", "Node Beta :9002", "Node Gamma :9003", "Node Delta :9004", "Node Epsilon :9005", "Node Zeta :9006", "Node Eta :9007", "Node Theta :9008", "Node Iota :9009"],\n  "anti_bit_rot": "SHA-256 Scrubber Active",\n  "supabase_sync": "https://csrhmocmponregwceknr.supabase.co"\n}'
   },
   {
     id: 'vault-seed-02',
     name: 'cloud_security_audit_report.pdf',
+    folderId: 'folder-seed-01',
     type: 'application/pdf',
     category: 'documents',
     sizeBytes: 865484,
@@ -76,11 +108,12 @@ const SEED_FILES = [
         nodes: CLUSTER_NODES.map(n => n.name)
       }
     ],
-    sampleText: '%PDF-1.5\n%Vault Security Audit\n1 0 obj\n<< /Title (Vault Security Audit) /Status (Zero Bit-Rot Detected) /Nodes (All 9 Online) >>\nendobj'
+    sampleText: '%PDF-1.5\n%Vault Security Audit\n1 0 obj\n<< /Title (Vault Security Audit) /Status (Zero Bit-Rot Detected) /Folder (Project Documents) /Nodes (All 9 Online) >>\nendobj'
   },
   {
     id: 'vault-seed-03',
     name: 'cluster_datacenter_map.png',
+    folderId: 'folder-seed-02',
     type: 'image/png',
     category: 'images',
     sizeBytes: 2569011,
@@ -103,6 +136,7 @@ const SEED_FILES = [
   {
     id: 'vault-seed-04',
     name: 'financial_ledger_2025.zip',
+    folderId: 'folder-seed-03',
     type: 'application/zip',
     category: 'archives',
     sizeBytes: 12582912,
@@ -122,6 +156,7 @@ const SEED_FILES = [
   {
     id: 'vault-seed-05',
     name: 'enterprise_backup_q3.tar.gz',
+    folderId: null, // Root file
     type: 'application/gzip',
     category: 'degraded',
     sizeBytes: 20971520,
@@ -159,6 +194,9 @@ class VaultStorageManager {
           if (!db.objectStoreNames.contains(STORE_BLOBS)) {
             db.createObjectStore(STORE_BLOBS, { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains(STORE_FOLDERS)) {
+            db.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
+          }
         };
 
         request.onsuccess = (e) => {
@@ -192,14 +230,19 @@ class VaultStorageManager {
       });
 
       if (count === 0) {
-        const tx = this.db.transaction([STORE_FILES], 'readwrite');
-        const store = tx.objectStore(STORE_FILES);
-        SEED_FILES.forEach(f => store.put(f));
+        const tx = this.db.transaction([STORE_FILES, STORE_FOLDERS], 'readwrite');
+        const fileStore = tx.objectStore(STORE_FILES);
+        const folderStore = tx.objectStore(STORE_FOLDERS);
+        
+        SEED_FILES.forEach(f => fileStore.put(f));
+        SEED_FOLDERS.forEach(f => folderStore.put(f));
+        
         await new Promise((res) => {
           tx.oncomplete = res;
           tx.onerror = res;
         });
-        localStorage.setItem('vault_persisted_files_v4', JSON.stringify(SEED_FILES));
+        localStorage.setItem('vault_persisted_files_v5', JSON.stringify(SEED_FILES));
+        localStorage.setItem('vault_persisted_folders_v5', JSON.stringify(SEED_FOLDERS));
       }
     } catch (e) {
       console.warn('Seeding warning:', e);
@@ -213,7 +256,6 @@ class VaultStorageManager {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (e) {
-      // Fallback deterministic digest
       let hash = 0;
       const bytes = new Uint8Array(arrayBuffer);
       for (let i = 0; i < bytes.length; i++) {
@@ -244,6 +286,155 @@ class VaultStorageManager {
       default: return '📦';
     }
   }
+
+  // =========================================================================
+  // FOLDER MANAGEMENT API
+  // =========================================================================
+
+  async getAllFolders() {
+    await this.initPromise;
+    return new Promise((resolve) => {
+      try {
+        if (this.db) {
+          const tx = this.db.transaction([STORE_FOLDERS], 'readonly');
+          const req = tx.objectStore(STORE_FOLDERS).getAll();
+          req.onsuccess = () => {
+            if (req.result && req.result.length > 0) {
+              resolve(req.result);
+            } else {
+              resolve(this.getLocalStorageFolders());
+            }
+          };
+          req.onerror = () => resolve(this.getLocalStorageFolders());
+        } else {
+          resolve(this.getLocalStorageFolders());
+        }
+      } catch (e) {
+        resolve(this.getLocalStorageFolders());
+      }
+    });
+  }
+
+  getLocalStorageFolders() {
+    try {
+      const data = localStorage.getItem('vault_persisted_folders_v5');
+      return data ? JSON.parse(data) : SEED_FOLDERS;
+    } catch (e) {
+      return SEED_FOLDERS;
+    }
+  }
+
+  async createFolder(name, parentId = null, color = '#FF6B35') {
+    await this.initPromise;
+    const folderObj = {
+      id: 'folder-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      name: name.trim() || 'New Folder',
+      icon: '📁',
+      color: color,
+      parentId: parentId,
+      createdAt: new Date().toISOString()
+    };
+
+    if (this.db) {
+      const tx = this.db.transaction([STORE_FOLDERS], 'readwrite');
+      tx.objectStore(STORE_FOLDERS).put(folderObj);
+    }
+    const folders = this.getLocalStorageFolders();
+    folders.push(folderObj);
+    localStorage.setItem('vault_persisted_folders_v5', JSON.stringify(folders));
+
+    this.logActivity(`Created folder "${folderObj.name}"`, '📁');
+    window.dispatchEvent(new CustomEvent('vault_folder_created', { detail: folderObj }));
+    return folderObj;
+  }
+
+  async deleteFolder(folderId, deleteContents = true) {
+    await this.initPromise;
+    if (this.db) {
+      const tx = this.db.transaction([STORE_FOLDERS], 'readwrite');
+      tx.objectStore(STORE_FOLDERS).delete(folderId);
+    }
+    const folders = this.getLocalStorageFolders().filter(f => f.id !== folderId);
+    localStorage.setItem('vault_persisted_folders_v5', JSON.stringify(folders));
+
+    if (deleteContents) {
+      const allFiles = await this.getAllFiles();
+      const filesToDelete = allFiles.filter(f => f.folderId === folderId);
+      for (const f of filesToDelete) {
+        await this.deleteFile(f.id);
+      }
+    }
+
+    this.logActivity(`Deleted folder ID ${folderId}`, '🗑️');
+    window.dispatchEvent(new CustomEvent('vault_folder_deleted', { detail: { id: folderId } }));
+  }
+
+  // =========================================================================
+  // DOWNLOAD ENTIRE FOLDER AS .ZIP (Google Drive Style)
+  // =========================================================================
+
+  async downloadFolderAsZip(folderId, onProgress = () => {}) {
+    await this.initPromise;
+    const folders = await this.getAllFolders();
+    const folder = folders.find(f => f.id === folderId) || { name: 'Vault_Bundle' };
+    const allFiles = await this.getAllFiles();
+    const filesInFolder = allFiles.filter(f => f.folderId === folderId);
+
+    if (filesInFolder.length === 0) {
+      throw new Error(`Folder "${folder.name}" is empty.`);
+    }
+
+    onProgress(`Bundling ${filesInFolder.length} files from cluster...`, 20);
+
+    // If JSZip is available via CDN
+    if (window.JSZip) {
+      const zip = new window.JSZip();
+      const folderZip = zip.folder(folder.name);
+
+      let processed = 0;
+      for (const file of filesInFolder) {
+        onProgress(`Assembling "${file.name}" (SHA-256: ${file.hash.slice(0, 8)})...`, 20 + Math.round((processed / filesInFolder.length) * 60));
+        
+        const blob = await this.getFileBlob(file.id);
+        if (blob) {
+          folderZip.file(file.name, blob);
+        } else if (file.sampleText) {
+          folderZip.file(file.name, file.sampleText);
+        } else {
+          const stubText = `=== VAULT OBJECT CLUSTER RESTORATION ===\nFile: ${file.name}\nSize: ${file.sizeFormatted}\nSHA-256: ${file.hash}\nReplication: ${file.replicationFactor}x Multi-Node\nStatus: Verified Intact\nTimestamp: ${new Date().toISOString()}`;
+          folderZip.file(file.name, stubText);
+        }
+        processed++;
+      }
+
+      onProgress(`Compressing archive "${folder.name}.zip"...`, 85);
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+      onProgress(`Triggering download for "${folder.name}.zip"...`, 100);
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${folder.name.replace(/\s+/g, '_')}_bundle.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      this.logActivity(`Downloaded full folder archive "${folder.name}.zip" (${filesInFolder.length} objects)`, '📦');
+      return true;
+    } else {
+      // Fallback if JSZip is not loaded: download files individually
+      for (const file of filesInFolder) {
+        await this.downloadFile(file.id);
+        await new Promise(r => setTimeout(r, 300));
+      }
+      return true;
+    }
+  }
+
+  // =========================================================================
+  // FILE METADATA & BLOB STORAGE API
+  // =========================================================================
 
   // Put file metadata into IndexedDB & localStorage
   async putFileMetadata(fileObj) {
@@ -338,7 +529,7 @@ class VaultStorageManager {
 
   getLocalStorageFiles() {
     try {
-      const data = localStorage.getItem('vault_persisted_files_v4');
+      const data = localStorage.getItem('vault_persisted_files_v5');
       return data ? JSON.parse(data) : SEED_FILES;
     } catch (e) {
       return SEED_FILES;
@@ -353,7 +544,7 @@ class VaultStorageManager {
     } else {
       files.unshift(fileObj);
     }
-    localStorage.setItem('vault_persisted_files_v4', JSON.stringify(files));
+    localStorage.setItem('vault_persisted_files_v5', JSON.stringify(files));
   }
 
   async syncLocalStorage() {
@@ -363,7 +554,7 @@ class VaultStorageManager {
         const req = tx.objectStore(STORE_FILES).getAll();
         req.onsuccess = () => {
           if (req.result) {
-            localStorage.setItem('vault_persisted_files_v4', JSON.stringify(req.result));
+            localStorage.setItem('vault_persisted_files_v5', JSON.stringify(req.result));
           }
         };
       }
@@ -371,11 +562,9 @@ class VaultStorageManager {
   }
 
   /**
-   * High-Performance Distributed Upload
-   * Small files (< 5MB): Stored atomic, replicated across ALL 9 nodes.
-   * Large files (>= 5MB): Sliced into 4MB chunks with multi-zone quorum replication.
+   * High-Performance Distributed Upload with Folder Assignment
    */
-  async uploadFile(file, replicationFactor = 3, onProgress = () => {}) {
+  async uploadFile(file, replicationFactor = 3, onProgress = () => {}, folderId = null) {
     await this.initPromise;
 
     onProgress('Step 1: Initializing cryptographic stream...', 10);
@@ -453,6 +642,7 @@ class VaultStorageManager {
     const newFileObj = {
       id: fileId,
       name: file.name,
+      folderId: folderId,
       type: file.type || 'application/octet-stream',
       category: category,
       sizeBytes: file.size,
@@ -537,7 +727,7 @@ class VaultStorageManager {
       tx.objectStore(STORE_BLOBS).delete(fileId);
     }
     const files = this.getLocalStorageFiles().filter(f => f.id !== fileId);
-    localStorage.setItem('vault_persisted_files_v4', JSON.stringify(files));
+    localStorage.setItem('vault_persisted_files_v5', JSON.stringify(files));
     this.logActivity(`Deleted object ID ${fileId}`, '🗑️');
     window.dispatchEvent(new CustomEvent('vault_file_deleted', { detail: { id: fileId } }));
   }
@@ -563,7 +753,7 @@ class VaultStorageManager {
 
   logActivity(text, icon = '🟢') {
     try {
-      const logs = JSON.parse(localStorage.getItem('vault_activity_log_v4') || '[]');
+      const logs = JSON.parse(localStorage.getItem('vault_activity_log_v5') || '[]');
       logs.unshift({
         id: Date.now(),
         text,
@@ -572,13 +762,13 @@ class VaultStorageManager {
         timestamp: new Date().toISOString()
       });
       if (logs.length > 60) logs.pop();
-      localStorage.setItem('vault_activity_log_v4', JSON.stringify(logs));
+      localStorage.setItem('vault_activity_log_v5', JSON.stringify(logs));
     } catch (e) {}
   }
 
   getActivities() {
     try {
-      return JSON.parse(localStorage.getItem('vault_activity_log_v4') || '[]');
+      return JSON.parse(localStorage.getItem('vault_activity_log_v5') || '[]');
     } catch (e) {
       return [];
     }

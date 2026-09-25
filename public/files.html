@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>File Manager — Vault Distributed Storage</title>
+  <title>File & Folder Manager — Vault Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="vault-storage.js"></script>
   <style>
     :root {
       --primary: #FF6B35;
       --primary-hover: #E85A24;
-      --primary-glow: rgba(255, 107, 53, 0.4);
       --secondary: #8B5CF6;
       --accent: #EC4899;
       --success: #10B981;
@@ -25,7 +25,7 @@
       --bg-card-hover: rgba(30, 37, 48, 0.95);
       --surface: #161B22;
       --surface-border: rgba(255, 107, 53, 0.18);
-      --surface-border-hover: rgba(255, 107, 53, 0.45);
+      --surface-border-hover: rgba(255, 107, 53, 0.4);
       --text: #F0F6FC;
       --text-muted: #8B949E;
       --text-dim: #6B7280;
@@ -148,13 +148,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       gap: 16px;
+      flex-wrap: wrap;
     }
     .search-box {
       display: flex; align-items: center; gap: 10px;
       background: var(--bg-card); border: 1px solid var(--surface-border);
-      border-radius: 12px; padding: 10px 18px; width: 100%; max-width: 440px;
+      border-radius: 12px; padding: 10px 18px; width: 100%; max-width: 400px;
     }
     .search-input {
       background: none; border: none; color: var(--text);
@@ -175,9 +176,135 @@
     .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--surface-border-hover); }
     .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
 
-    .view-toggle { display: flex; background: var(--bg-card); border: 1px solid var(--surface-border); border-radius: 8px; padding: 2px; }
-    .view-btn { background: none; border: none; padding: 6px 12px; color: var(--text-muted); font-size: 13px; font-weight: 700; border-radius: 6px; cursor: pointer; }
-    .view-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    /* Breadcrumbs Navigation (Google Drive Style) */
+    .breadcrumbs-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--surface-border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .crumb-link {
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s;
+    }
+    .crumb-link:hover { color: var(--primary); }
+    .crumb-active { color: var(--text); font-weight: 800; display: flex; align-items: center; gap: 6px; }
+    .crumb-sep { color: var(--text-dim); font-size: 12px; }
+
+    /* Folder Cards Grid */
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 17px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .folders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .folder-card {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-card);
+      transition: all 0.25s ease;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+    .folder-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary);
+      box-shadow: 0 12px 30px -8px rgba(255, 107, 53, 0.25);
+    }
+    .folder-card-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .folder-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255, 107, 53, 0.12);
+      border: 1px solid rgba(255, 107, 53, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .folder-card-info {
+      min-width: 0;
+    }
+    .folder-card-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .folder-card-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .folder-card-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* Active Folder Banner */
+    .folder-banner {
+      background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .folder-banner-title {
+      font-size: 22px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .folder-banner-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
 
     /* Files Grid */
     .files-grid {
@@ -214,7 +341,7 @@
     .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
     .badge-rep { background: rgba(255, 107, 53, 0.15); color: var(--primary); }
 
-    /* Detail Drawer */
+    /* Modals & Drawers */
     .drawer-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
@@ -231,8 +358,7 @@
     .drawer.show { right: 0; }
     .drawer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 
-    /* Upload Modal */
-    .upload-modal {
+    .modal-box {
       position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95);
       width: 90%; max-width: 520px;
       background: var(--surface); border: 1px solid var(--surface-border);
@@ -242,7 +368,7 @@
       display: none; opacity: 0;
       transition: all 0.25s ease;
     }
-    .upload-modal.show {
+    .modal-box.show {
       display: block; opacity: 1;
       transform: translate(-50%, -50%) scale(1);
     }
@@ -254,6 +380,15 @@
     }
     .chunk-step.active { border-left: 3px solid var(--primary); color: #FFFFFF; font-weight: 700; }
     .chunk-step.done { border-left: 3px solid var(--success); color: var(--success); }
+
+    .form-input {
+      width: 100%; padding: 12px 16px;
+      border-radius: 10px; border: 1px solid var(--surface-border);
+      background: rgba(0,0,0,0.25); color: var(--text);
+      font-family: var(--font); font-size: 14px; outline: none;
+      margin-top: 8px;
+    }
+    .form-input:focus { border-color: var(--primary); }
 
     .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
     .toast {
@@ -304,16 +439,20 @@
     <div class="topbar">
       <div class="search-box">
         <span>🔍</span>
-        <input type="text" class="search-input" id="fileSearch" placeholder="Search objects by name or SHA-256..." oninput="handleSearch(this.value)" />
+        <input type="text" class="search-input" id="fileSearch" placeholder="Search files or folders..." oninput="handleSearch(this.value)" />
         <span class="search-hint">Ctrl+K</span>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
         <select class="btn btn-secondary" id="repSelect">
           <option value="3" selected>3× Quorum (Standard)</option>
           <option value="5">5× Quorum (High Durability)</option>
           <option value="2">2× Economy Mode</option>
         </select>
+
+        <button class="btn btn-secondary" onclick="openNewFolderModal()">
+          <span>➕</span> New Folder
+        </button>
 
         <button class="btn btn-primary" onclick="openUploadModal()">
           <span>📤</span> Upload Document / Video
@@ -321,14 +460,46 @@
       </div>
     </div>
 
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-      <h2 style="font-size: 20px; font-weight: 800;" id="categoryTitle">All Storage Objects</h2>
-      <div class="view-toggle">
-        <button class="view-btn active" id="btnGrid" onclick="setView('grid')">Grid</button>
-        <button class="view-btn" id="btnList" onclick="setView('list')">List</button>
+    <!-- Breadcrumbs Navigation -->
+    <div class="breadcrumbs-bar" id="breadcrumbsBar">
+      <span class="crumb-link" onclick="navigateToFolder(null)"><span>📁</span> My Files</span>
+    </div>
+
+    <!-- Active Folder Banner (Only when inside a folder) -->
+    <div class="folder-banner" id="folderBanner" style="display: none;">
+      <div>
+        <div class="folder-banner-title" id="folderBannerTitle">
+          <span>📂</span> <span id="folderBannerName">Project Documents</span>
+        </div>
+        <div class="folder-banner-desc" id="folderBannerDesc">
+          Contains 2 files • 860.05 KB distributed across cluster nodes
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="downloadCurrentFolderZip()">
+          <span>📦</span> Download Entire Folder (.zip)
+        </button>
+        <button class="btn btn-secondary" onclick="navigateToFolder(null)">
+          <span>⬅️</span> Back to All Folders
+        </button>
       </div>
     </div>
 
+    <!-- Folders Section (Google Drive Style) -->
+    <div id="foldersSection">
+      <div class="section-title-row">
+        <h3 class="section-title"><span>📂</span> Folders (<span id="folderCount">0</span>)</h3>
+      </div>
+      <div class="folders-grid" id="foldersContainer">
+        <!-- Folders rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Files Section -->
+    <div class="section-title-row">
+      <h3 class="section-title" id="filesSectionTitle"><span>📄</span> Files (<span id="filesCount">0</span>)</h3>
+    </div>
     <div class="files-grid" id="filesContainer">
       <!-- Loaded dynamically from permanent IndexedDB / localStorage -->
     </div>
@@ -344,11 +515,30 @@
     <div id="drawerContent"></div>
   </div>
 
+  <!-- New Folder Modal -->
+  <div class="drawer-backdrop" id="newFolderBackdrop" onclick="closeNewFolderModal()"></div>
+  <div class="modal-box" id="newFolderModal">
+    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Create New Folder</h3>
+    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+      Organize your distributed objects into virtual folders. You can download any folder as a single bundled .ZIP file at any time.
+    </p>
+
+    <div style="margin-bottom: 20px;">
+      <label style="font-size: 13px; font-weight: 700;">Folder Name</label>
+      <input type="text" class="form-input" id="newFolderNameInput" placeholder="e.g. Q4 Financial Reports" autofocus />
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button class="btn btn-secondary" onclick="closeNewFolderModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewFolder()">Create Folder</button>
+    </div>
+  </div>
+
   <!-- Upload Modal -->
-  <div class="drawer-backdrop" id="uploadModalBackdrop"></div>
-  <div class="upload-modal" id="uploadModal">
-    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Upload & Multi-Node Distribution</h3>
-    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+  <div class="drawer-backdrop" id="uploadModalBackdrop" onclick="closeUploadModal()"></div>
+  <div class="modal-box" id="uploadModal">
+    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;" id="uploadModalTitle">Upload & Multi-Node Distribution</h3>
+    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;" id="uploadModalDesc">
       Files &lt; 5MB broadcast across all 9 nodes. Files &ge; 5MB partition into 4MB high-throughput chunks with SHA-256 verification.
     </p>
 
@@ -373,34 +563,127 @@
     let currentCategory = 'all';
     let currentSearch = '';
     let loadedFiles = [];
+    let loadedFolders = [];
+    let activeFolderId = null; // null = root
 
-    async function loadFiles() {
+    async function loadData() {
+      loadedFolders = await window.vaultStore.getAllFolders();
       loadedFiles = await window.vaultStore.getAllFiles();
+      renderBreadcrumbs();
+      renderFolders();
       renderFiles();
+    }
+
+    function navigateToFolder(folderId) {
+      activeFolderId = folderId;
+      renderBreadcrumbs();
+      renderFolders();
+      renderFiles();
+    }
+
+    function renderBreadcrumbs() {
+      const bar = document.getElementById('breadcrumbsBar');
+      if (!activeFolderId) {
+        bar.innerHTML = `<span class="crumb-active"><span>📁</span> My Files (Root Directory)</span>`;
+        document.getElementById('folderBanner').style.display = 'none';
+        document.getElementById('foldersSection').style.display = 'block';
+      } else {
+        const folder = loadedFolders.find(f => f.id === activeFolderId);
+        const folderName = folder ? folder.name : 'Folder';
+        bar.innerHTML = `
+          <span class="crumb-link" onclick="navigateToFolder(null)"><span>📁</span> My Files</span>
+          <span class="crumb-sep">&gt;</span>
+          <span class="crumb-active"><span>📂</span> ${folderName}</span>
+        `;
+
+        // Update Folder Banner
+        const filesInFolder = loadedFiles.filter(f => f.folderId === activeFolderId);
+        const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
+        document.getElementById('folderBannerName').textContent = folderName;
+        document.getElementById('folderBannerDesc').textContent = `Contains ${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)} distributed across cluster nodes`;
+        document.getElementById('folderBanner').style.display = 'flex';
+        document.getElementById('foldersSection').style.display = 'none'; // hide top folders list when inside a folder
+      }
+    }
+
+    function renderFolders() {
+      const container = document.getElementById('foldersContainer');
+      container.innerHTML = '';
+
+      if (activeFolderId) {
+        document.getElementById('folderCount').textContent = '0';
+        return;
+      }
+
+      const filteredFolders = loadedFolders.filter(f => {
+        return !currentSearch || f.name.toLowerCase().includes(currentSearch.toLowerCase());
+      });
+
+      document.getElementById('folderCount').textContent = filteredFolders.length;
+
+      if (filteredFolders.length === 0) {
+        container.innerHTML = `<div style="grid-column: 1/-1; padding: 20px; color: var(--text-muted); font-size: 13.5px;">No folders created yet. Click "+ New Folder" to organize files.</div>`;
+        return;
+      }
+
+      filteredFolders.forEach(folder => {
+        const filesInFolder = loadedFiles.filter(f => f.folderId === folder.id);
+        const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
+
+        const card = document.createElement('div');
+        card.className = 'folder-card';
+        card.onclick = () => navigateToFolder(folder.id);
+
+        card.innerHTML = `
+          <div class="folder-card-left">
+            <div class="folder-card-icon" style="color: ${folder.color || 'var(--primary)'};">📂</div>
+            <div class="folder-card-info">
+              <div class="folder-card-name">${folder.name}</div>
+              <div class="folder-card-meta">${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)}</div>
+            </div>
+          </div>
+          <div class="folder-card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-secondary" onclick="downloadFolderZip('${folder.id}')" title="Download Entire Folder as .ZIP Archive">📦 ZIP</button>
+            <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.25);" onclick="deleteFolder('${folder.id}')" title="Delete Folder & Contained Files">🗑️</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
     }
 
     function renderFiles() {
       const container = document.getElementById('filesContainer');
       container.innerHTML = '';
 
-      const filtered = loadedFiles.filter(f => {
-        const matchesCat = currentCategory === 'all' || f.category === currentCategory;
-        const matchesSearch = !currentSearch || f.name.toLowerCase().includes(currentSearch.toLowerCase()) || (f.hash && f.hash.includes(currentSearch));
-        return matchesCat && matchesSearch;
-      });
+      let filesToShow = loadedFiles;
 
-      document.getElementById('categoryTitle').textContent = `All Storage Objects (${filtered.length} Items)`;
+      if (activeFolderId) {
+        filesToShow = loadedFiles.filter(f => f.folderId === activeFolderId);
+        const folder = loadedFolders.find(f => f.id === activeFolderId);
+        document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> Files inside "<strong>${folder ? folder.name : 'Folder'}</strong>" (${filesToShow.length})`;
+      } else {
+        if (currentCategory !== 'all') {
+          filesToShow = filesToShow.filter(f => f.category === currentCategory);
+        }
+        document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> Storage Objects (${filesToShow.length})`;
+      }
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-muted);">
-          <div style="font-size: 40px; margin-bottom: 12px;">📂</div>
-          <div style="font-weight: 700; font-size: 18px;">No objects found in this view</div>
-          <div style="font-size: 14px; margin-top: 4px;">Upload any video, document, or archive above. It will remain permanently stored!</div>
+      if (currentSearch) {
+        filesToShow = filesToShow.filter(f => f.name.toLowerCase().includes(currentSearch.toLowerCase()) || (f.hash && f.hash.includes(currentSearch)));
+      }
+
+      document.getElementById('filesCount').textContent = filesToShow.length;
+
+      if (filesToShow.length === 0) {
+        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; color: var(--text-muted);">
+          <div style="font-size: 36px; margin-bottom: 10px;">📂</div>
+          <div style="font-weight: 700; font-size: 16px;">No files found in this view</div>
+          <div style="font-size: 13.5px; margin-top: 4px;">Click "+ Upload Document / Video" to add files.</div>
         </div>`;
         return;
       }
 
-      filtered.forEach(file => {
+      filesToShow.forEach(file => {
         const card = document.createElement('div');
         card.className = 'file-card';
         card.onclick = () => openDrawer(file);
@@ -416,7 +699,7 @@
           <div class="file-card-name">${file.name}</div>
           <div class="file-card-meta">
             <span>${file.sizeFormatted}</span>
-            <span>${isSmall ? 'Single Block' : file.chunksCount + ' Chunks (4MB)'}</span>
+            <span>${isSmall ? 'Single Block' : (file.chunksCount || (file.chunks ? file.chunks.length : 1)) + ' Chunks (4MB)'}</span>
           </div>
 
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -437,14 +720,74 @@
 
     function filterCategory(cat) {
       currentCategory = cat;
+      activeFolderId = null;
       document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
       if (event && event.target) event.target.classList.add('active');
+      renderBreadcrumbs();
+      renderFolders();
       renderFiles();
     }
 
     function handleSearch(val) {
       currentSearch = val;
+      renderFolders();
       renderFiles();
+    }
+
+    // New Folder Modal
+    function openNewFolderModal() {
+      document.getElementById('newFolderBackdrop').style.display = 'block';
+      document.getElementById('newFolderModal').classList.add('show');
+      document.getElementById('newFolderNameInput').value = '';
+      setTimeout(() => document.getElementById('newFolderNameInput').focus(), 100);
+    }
+
+    function closeNewFolderModal() {
+      document.getElementById('newFolderBackdrop').style.display = 'none';
+      document.getElementById('newFolderModal').classList.remove('show');
+    }
+
+    async function submitNewFolder() {
+      const name = document.getElementById('newFolderNameInput').value.trim();
+      if (!name) {
+        showToast('Please enter a folder name.', 'warning');
+        return;
+      }
+      await window.vaultStore.createFolder(name, activeFolderId);
+      closeNewFolderModal();
+      await loadData();
+      showToast(`📁 Created folder "${name}"!`, 'success');
+    }
+
+    async function deleteFolder(folderId) {
+      const folder = loadedFolders.find(f => f.id === folderId);
+      const name = folder ? folder.name : 'Folder';
+      if (confirm(`Are you sure you want to delete folder "${name}" and all files inside it?`)) {
+        await window.vaultStore.deleteFolder(folderId, true);
+        if (activeFolderId === folderId) activeFolderId = null;
+        await loadData();
+        showToast(`🗑️ Deleted folder "${name}"`, 'danger');
+      }
+    }
+
+    async function downloadFolderZip(folderId) {
+      const folder = loadedFolders.find(f => f.id === folderId);
+      const name = folder ? folder.name : 'Folder';
+      showToast(`📦 Bundling "${name}" into .ZIP from distributed storage...`, 'info');
+      try {
+        await window.vaultStore.downloadFolderAsZip(folderId, (msg, pct) => {
+          showToast(msg, 'info');
+        });
+        showToast(`✅ Downloaded "${name}.zip" successfully!`, 'success');
+      } catch (err) {
+        showToast(err.message || 'Error downloading folder archive', 'danger');
+      }
+    }
+
+    function downloadCurrentFolderZip() {
+      if (activeFolderId) {
+        downloadFolderZip(activeFolderId);
+      }
     }
 
     function openDrawer(file) {
@@ -504,6 +847,10 @@
     }
 
     function openUploadModal() {
+      const activeFolder = activeFolderId ? loadedFolders.find(f => f.id === activeFolderId) : null;
+      document.getElementById('uploadModalTitle').textContent = activeFolder
+        ? `Upload into "${activeFolder.name}"`
+        : 'Upload & Multi-Node Distribution';
       document.getElementById('uploadModalBackdrop').style.display = 'block';
       document.getElementById('uploadModal').classList.add('show');
       document.getElementById('chunkSteps').style.display = 'none';
@@ -561,15 +908,15 @@
               ? 'Step 4: Committing replicas across ALL 9 cluster nodes (:9001 - :9009)'
               : `Step 4: Distributing ${Math.ceil(file.size / 4194304)} x 4MB chunks across ${repFactor} Quorum Nodes`;
           }
-        });
+        }, activeFolderId);
 
         steps[2].className = 'chunk-step done';
         steps[3].className = 'chunk-step done';
         document.getElementById('step4-text').textContent = 'Step 4: All replicas confirmed written and verified! ✓';
 
-        setTimeout(() => {
+        setTimeout(async () => {
           closeUploadModal();
-          loadFiles();
+          await loadData();
           showToast(
             isSmall
               ? `✅ "${file.name}" broadcasted across ALL 9 cluster nodes permanently!`
@@ -580,9 +927,9 @@
       } catch (err) {
         console.error('Upload error:', err);
         steps[3].className = 'chunk-step done';
-        setTimeout(() => {
+        setTimeout(async () => {
           closeUploadModal();
-          loadFiles();
+          await loadData();
           showToast(`Uploaded "${file.name}" with local persistence fallback`, 'success');
         }, 400);
       }
@@ -590,7 +937,7 @@
 
     async function deleteFile(id) {
       await window.vaultStore.deleteFile(id);
-      loadFiles();
+      await loadData();
       showToast('🗑️ Object removed from cluster', 'danger');
     }
 
@@ -610,13 +957,6 @@
       showToast('🔗 Shareable Supabase object link copied to clipboard!', 'success');
     }
 
-    function setView(v) {
-      document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
-      document.getElementById('btnList').classList.toggle('active', v === 'list');
-      const c = document.getElementById('filesContainer');
-      c.style.gridTemplateColumns = v === 'list' ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))';
-    }
-
     function showToast(msg, type = 'info') {
       const c = document.getElementById('toastContainer');
       const t = document.createElement('div');
@@ -631,9 +971,11 @@
       }, 3500);
     }
 
-    window.addEventListener('DOMContentLoaded', loadFiles);
-    window.addEventListener('vault_file_uploaded', loadFiles);
-    window.addEventListener('vault_file_deleted', loadFiles);
+    window.addEventListener('DOMContentLoaded', loadData);
+    window.addEventListener('vault_file_uploaded', loadData);
+    window.addEventListener('vault_file_deleted', loadData);
+    window.addEventListener('vault_folder_created', loadData);
+    window.addEventListener('vault_folder_deleted', loadData);
   </script>
 </body>
 </html>

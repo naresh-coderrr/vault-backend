@@ -503,6 +503,7 @@
     }
 
     function clearActivity() {
+      localStorage.removeItem('vault_activity_log_v5');
       localStorage.removeItem('vault_activity_log_v4');
       renderActivities();
       showToast('Activity log cleared', 'info');
