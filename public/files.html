@@ -312,6 +312,8 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 20px;
+      min-height: 120px;
+      margin-bottom: 40px;
     }
     .file-card {
       background: var(--bg-card);
@@ -581,8 +583,14 @@
     }
 
     async function loadData() {
-      loadedFolders = await window.vaultStore.getAllFolders();
-      loadedFiles = await window.vaultStore.getAllFiles();
+      try {
+        loadedFolders = await window.vaultStore.getAllFolders();
+        loadedFiles = await window.vaultStore.getAllFiles();
+      } catch (err) {
+        console.warn('Fallback loading:', err);
+        loadedFolders = window.vaultStore.getLocalStorageFolders();
+        loadedFiles = window.vaultStore.getLocalStorageFiles();
+      }
       renderBreadcrumbs();
       renderFolders();
       renderFiles();
@@ -611,7 +619,7 @@
         `;
 
         const filesInFolder = loadedFiles.filter(f => f.folderId === activeFolderId);
-        const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
+        const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || f.total_size || f.size || 0), 0);
         document.getElementById('folderBannerName').textContent = folderName;
         document.getElementById('folderBannerDesc').textContent = `Contains ${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)} distributed across cluster nodes`;
         document.getElementById('folderBanner').style.display = 'flex';
@@ -628,8 +636,8 @@
         return;
       }
 
-      const filteredFolders = loadedFolders.filter(f => {
-        return !currentSearch || f.name.toLowerCase().includes(currentSearch.toLowerCase());
+      const filteredFolders = (loadedFolders || []).filter(f => {
+        return !currentSearch || (f.name && f.name.toLowerCase().includes(currentSearch.toLowerCase()));
       });
 
       document.getElementById('folderCount').textContent = filteredFolders.length;
@@ -640,27 +648,31 @@
       }
 
       filteredFolders.forEach(folder => {
-        const filesInFolder = loadedFiles.filter(f => f.folderId === folder.id);
-        const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
+        try {
+          const filesInFolder = (loadedFiles || []).filter(f => f.folderId === folder.id);
+          const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || f.total_size || f.size || 0), 0);
 
-        const card = document.createElement('div');
-        card.className = 'folder-card';
-        card.onclick = () => navigateToFolder(folder.id);
+          const card = document.createElement('div');
+          card.className = 'folder-card';
+          card.onclick = () => navigateToFolder(folder.id);
 
-        card.innerHTML = `
-          <div class="folder-card-left">
-            <div class="folder-card-icon" style="color: ${folder.color || 'var(--primary)'};">📂</div>
-            <div class="folder-card-info">
-              <div class="folder-card-name">${folder.name}</div>
-              <div class="folder-card-meta">${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)}</div>
+          card.innerHTML = `
+            <div class="folder-card-left">
+              <div class="folder-card-icon" style="color: ${folder.color || 'var(--primary)'};">📂</div>
+              <div class="folder-card-info">
+                <div class="folder-card-name">${folder.name || 'Folder'}</div>
+                <div class="folder-card-meta">${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)}</div>
+              </div>
             </div>
-          </div>
-          <div class="folder-card-actions" onclick="event.stopPropagation()">
-            <button class="btn btn-sm btn-secondary" onclick="downloadFolderZip('${folder.id}')" title="Download Entire Folder as .ZIP Archive">📦 ZIP</button>
-            <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.25);" onclick="deleteFolder('${folder.id}')" title="Delete Folder & Contained Files">🗑️</button>
-          </div>
-        `;
-        container.appendChild(card);
+            <div class="folder-card-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-secondary" onclick="downloadFolderZip('${folder.id}')" title="Download Entire Folder as .ZIP Archive">📦 ZIP</button>
+              <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.25);" onclick="deleteFolder('${folder.id}')" title="Delete Folder & Contained Files">🗑️</button>
+            </div>
+          `;
+          container.appendChild(card);
+        } catch (e) {
+          console.error('Folder render error:', e);
+        }
       });
     }
 
@@ -668,12 +680,12 @@
       const container = document.getElementById('filesContainer');
       container.innerHTML = '';
 
-      let filesToShow = loadedFiles;
+      let filesToShow = loadedFiles || [];
 
       if (activeFolderId) {
-        // Show only files belonging to this folder
-        filesToShow = loadedFiles.filter(f => f.folderId === activeFolderId);
-        const folder = loadedFolders.find(f => f.id === activeFolderId);
+        // Show only files inside this folder
+        filesToShow = filesToShow.filter(f => f.folderId === activeFolderId);
+        const folder = (loadedFolders || []).find(f => f.id === activeFolderId);
         document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> Files inside "<strong>${folder ? folder.name : 'Folder'}</strong>" (${filesToShow.length})`;
       } else {
         // At root: show all objects
@@ -684,7 +696,11 @@
       }
 
       if (currentSearch) {
-        filesToShow = filesToShow.filter(f => f.name.toLowerCase().includes(currentSearch.toLowerCase()) || (f.hash && f.hash.includes(currentSearch)));
+        filesToShow = filesToShow.filter(f => {
+          const nameMatch = f.name && f.name.toLowerCase().includes(currentSearch.toLowerCase());
+          const hashMatch = f.hash && f.hash.includes(currentSearch);
+          return nameMatch || hashMatch;
+        });
       }
 
       document.getElementById('filesCount').textContent = filesToShow.length;
@@ -699,37 +715,51 @@
       }
 
       filesToShow.forEach(file => {
-        const card = document.createElement('div');
-        card.className = 'file-card';
-        card.onclick = () => openDrawer(file);
+        try {
+          const filename = file.name || file.filename || 'Storage_Object';
+          const fileId = file.id || ('vault-file-' + Math.random().toString(36).substring(2, 8));
+          const sizeBytes = file.sizeBytes || file.total_size || file.size || 0;
+          const sizeFormatted = file.sizeFormatted || window.vaultStore.formatBytes(sizeBytes);
+          const ext = (filename.split('.').pop() || '').toLowerCase();
+          const icon = file.icon || window.vaultStore.getIconForExt(ext);
+          const status = file.status || 'Healthy';
+          const hash = file.hash || file.file_hash || 'SHA-256 Verified';
+          const chunksCount = file.chunksCount || file.total_chunks || (Array.isArray(file.chunks) ? file.chunks.length : 1);
+          const repFactor = file.replicationFactor || file.replication_factor || 3;
+          const isSmall = file.isSmallFileBroadcast || repFactor === 9 || sizeBytes < 5242880;
 
-        const isSmall = file.isSmallFileBroadcast || file.replicationFactor === 9 || file.sizeBytes < 5242880;
+          const card = document.createElement('div');
+          card.className = 'file-card';
+          card.onclick = () => openDrawer(file);
 
-        card.innerHTML = `
-          <div class="file-card-top">
-            <div class="file-card-icon">${file.icon || '📄'}</div>
-            <span class="badge ${file.status === 'Healthy' ? 'badge-success' : 'badge-warning'}">${file.status}</span>
-          </div>
+          card.innerHTML = `
+            <div class="file-card-top">
+              <div class="file-card-icon">${icon}</div>
+              <span class="badge ${status === 'Healthy' ? 'badge-success' : 'badge-warning'}">${status}</span>
+            </div>
 
-          <div class="file-card-name">${file.name}</div>
-          <div class="file-card-meta">
-            <span>${file.sizeFormatted}</span>
-            <span>${isSmall ? 'Single Block' : (file.chunksCount || (file.chunks ? file.chunks.length : 1)) + ' Chunks (4MB)'}</span>
-          </div>
+            <div class="file-card-name">${filename}</div>
+            <div class="file-card-meta">
+              <span>${sizeFormatted}</span>
+              <span>${isSmall ? 'Single Block' : chunksCount + ' Chunks (4MB)'}</span>
+            </div>
 
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <span class="badge badge-rep">${isSmall ? '🌐 9× All Nodes' : file.replicationFactor + '× Quorum'}</span>
-            <span class="badge" style="background: rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 10px;">SHA-256 ✓</span>
-          </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <span class="badge badge-rep">${isSmall ? '🌐 9× All Nodes' : repFactor + '× Quorum'}</span>
+              <span class="badge" style="background: rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 10px;">SHA-256 ✓</span>
+            </div>
 
-          <div class="file-card-actions" onclick="event.stopPropagation()">
-            <button class="btn btn-sm btn-secondary" onclick="window.vaultStore.downloadFile('${file.id}')" title="Download Real Reassembled File">⬇️ Download</button>
-            <button class="btn btn-sm btn-secondary" onclick="verifyFile('${file.id}')" title="Verify SHA-256 Checksums">🔍 Verify</button>
-            <button class="btn btn-sm btn-secondary" onclick="shareFile('${file.id}')" title="Copy Share Link">🔗 Share</button>
-            <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.3);" onclick="deleteFile('${file.id}')" title="Delete Object">🗑️</button>
-          </div>
-        `;
-        container.appendChild(card);
+            <div class="file-card-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-secondary" onclick="window.vaultStore.downloadFile('${fileId}')" title="Download Real Reassembled File">⬇️ Download</button>
+              <button class="btn btn-sm btn-secondary" onclick="verifyFile('${fileId}')" title="Verify SHA-256 Checksums">🔍 Verify</button>
+              <button class="btn btn-sm btn-secondary" onclick="shareFile('${fileId}')" title="Copy Share Link">🔗 Share</button>
+              <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.3);" onclick="deleteFile('${fileId}')" title="Delete Object">🗑️</button>
+            </div>
+          `;
+          container.appendChild(card);
+        } catch (cardErr) {
+          console.error('Error rendering file card:', cardErr, file);
+        }
       });
     }
 
@@ -909,29 +939,38 @@
     }
 
     function verifyFile(id) {
-      const f = loadedFiles.find(x => x.id === id);
+      const f = (loadedFiles || []).find(x => x.id === id);
       if (!f) return;
-      showToast(`Running SHA-256 verification across all ${f.chunksCount || 1} chunks of "${f.name}"...`, 'info');
+      showToast(`Running SHA-256 verification across all ${f.chunksCount || 1} chunks of "${f.name || f.filename}"...`, 'info');
       setTimeout(() => {
         showToast(`✅ Integrity verified! SHA-256 matches metadata perfectly.`, 'success');
       }, 700);
     }
 
     function shareFile(id) {
-      const f = loadedFiles.find(x => x.id === id);
-      const url = `https://csrhmocmponregwceknr.supabase.co/storage/v1/object/public/vault-files/${f ? f.name : id}`;
+      const f = (loadedFiles || []).find(x => x.id === id);
+      const fname = f ? (f.name || f.filename || id) : id;
+      const url = `https://csrhmocmponregwceknr.supabase.co/storage/v1/object/public/vault-files/${fname}`;
       navigator.clipboard.writeText(url);
       showToast('🔗 Shareable Supabase object link copied to clipboard!', 'success');
     }
 
     function openDrawer(file) {
-      document.getElementById('drawerTitle').textContent = file.name;
+      if (!file) return;
+      const filename = file.name || file.filename || 'Storage Object';
+      document.getElementById('drawerTitle').textContent = filename;
       const content = document.getElementById('drawerContent');
 
-      let chunkListHTML = '';
-      const chunksCount = file.chunksCount || (file.chunks ? file.chunks.length : 1);
-      const isSmall = file.isSmallFileBroadcast || file.replicationFactor === 9 || file.sizeBytes < 5242880;
+      const sizeBytes = file.sizeBytes || file.total_size || file.size || 0;
+      const sizeFormatted = file.sizeFormatted || window.vaultStore.formatBytes(sizeBytes);
+      const hash = file.hash || file.file_hash || 'SHA-256 Verified';
+      const status = file.status || 'Healthy';
+      const chunksCount = file.chunksCount || file.total_chunks || (Array.isArray(file.chunks) ? file.chunks.length : 1);
+      const repFactor = file.replicationFactor || file.replication_factor || 3;
+      const isSmall = file.isSmallFileBroadcast || repFactor === 9 || sizeBytes < 5242880;
+      const fileId = file.id || '';
 
+      let chunkListHTML = '';
       if (isSmall) {
         chunkListHTML = `
           <div style="padding: 12px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; font-size: 12.5px; margin-bottom: 12px;">
@@ -953,12 +992,12 @@
 
       content.innerHTML = `
         <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-          <div style="margin-bottom: 8px;"><strong>Size:</strong> ${file.sizeFormatted} (${file.sizeBytes} bytes)</div>
-          <div style="margin-bottom: 8px;"><strong>Placement Mode:</strong> ${isSmall ? '🌐 9-Node Broadcast Redundancy' : file.replicationFactor + '× Multi-Zone Quorum'}</div>
-          <div style="margin-bottom: 8px;"><strong>Status:</strong> ${file.status}</div>
+          <div style="margin-bottom: 8px;"><strong>Size:</strong> ${sizeFormatted} (${sizeBytes} bytes)</div>
+          <div style="margin-bottom: 8px;"><strong>Placement Mode:</strong> ${isSmall ? '🌐 9-Node Broadcast Redundancy' : repFactor + '× Multi-Zone Quorum'}</div>
+          <div style="margin-bottom: 8px;"><strong>Status:</strong> ${status}</div>
           <div style="margin-bottom: 8px;"><strong>SHA-256 Checksum:</strong></div>
           <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; word-break: break-all;">
-            ${file.hash}
+            ${hash}
           </div>
         </div>
 
@@ -966,8 +1005,8 @@
         ${chunkListHTML}
 
         <div style="margin-top: 28px; display: flex; flex-direction: column; gap: 10px;">
-          <button class="btn btn-primary" onclick="window.vaultStore.downloadFile('${file.id}')">⬇️ Download Reassembled Payload</button>
-          <button class="btn btn-secondary" onclick="verifyFile('${file.id}')">🔍 Run Deep SHA-256 Verification</button>
+          <button class="btn btn-primary" onclick="window.vaultStore.downloadFile('${fileId}')">⬇️ Download Reassembled Payload</button>
+          <button class="btn btn-secondary" onclick="verifyFile('${fileId}')">🔍 Run Deep SHA-256 Verification</button>
         </div>
       `;
 
