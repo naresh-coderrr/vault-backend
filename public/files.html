@@ -21,18 +21,18 @@
       --info: #3B82F6;
 
       --bg: #0D1117;
-      --bg-card: rgba(22, 27, 34, 0.85);
-      --bg-card-hover: rgba(30, 37, 48, 0.95);
+      --bg-card: rgba(22, 27, 34, 0.92);
+      --bg-card-hover: rgba(30, 37, 48, 0.98);
       --surface: #161B22;
-      --surface-border: rgba(255, 107, 53, 0.18);
-      --surface-border-hover: rgba(255, 107, 53, 0.4);
+      --surface-border: rgba(255, 107, 53, 0.22);
+      --surface-border-hover: rgba(255, 107, 53, 0.5);
       --text: #F0F6FC;
       --text-muted: #8B949E;
       --text-dim: #6B7280;
-      --glass: rgba(18, 21, 31, 0.75);
+      --glass: rgba(18, 21, 31, 0.85);
       --glass-blur: blur(24px);
       --gradient-brand: linear-gradient(135deg, #FF6B35 0%, #F59E0B 50%, #8B5CF6 100%);
-      --shadow-card: 0 14px 40px -6px rgba(0, 0, 0, 0.45);
+      --shadow-card: 0 14px 40px -6px rgba(0, 0, 0, 0.55);
       --radius-sm: 8px;
       --radius-md: 14px;
       --radius-lg: 20px;
@@ -43,9 +43,9 @@
 
     [data-theme="light"] {
       --bg: #F4F6F8;
-      --bg-card: rgba(255, 255, 255, 0.95);
+      --bg-card: rgba(255, 255, 255, 0.98);
       --surface: #FFFFFF;
-      --surface-border: rgba(255, 107, 53, 0.2);
+      --surface-border: rgba(255, 107, 53, 0.25);
       --text: #1F2937;
       --text-muted: #6B7280;
     }
@@ -216,6 +216,23 @@
       gap: 8px;
     }
 
+    .view-toggle-btn-group {
+      display: flex;
+      background: var(--bg-card);
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .view-btn {
+      background: none; border: none; padding: 6px 12px;
+      color: var(--text-muted); font-size: 12px; font-weight: 700;
+      border-radius: 6px; cursor: pointer; transition: all 0.2s;
+    }
+    .view-btn.active {
+      background: var(--surface); color: var(--primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
     /* Folders Grid */
     .folders-grid {
       display: grid;
@@ -283,7 +300,7 @@
 
     /* Active Folder Banner */
     .folder-banner {
-      background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+      background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
       border: 1px solid var(--surface-border);
       border-radius: var(--radius-lg);
       padding: 24px 28px;
@@ -307,10 +324,10 @@
       margin-top: 4px;
     }
 
-    /* Files Grid */
+    /* Files Grid View */
     .files-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
       gap: 20px;
       min-height: 120px;
       margin-bottom: 40px;
@@ -331,13 +348,47 @@
     .file-card:hover {
       transform: translateY(-4px);
       border-color: var(--surface-border-hover);
-      box-shadow: 0 18px 40px -10px rgba(0,0,0,0.5);
+      box-shadow: 0 18px 40px -10px rgba(0,0,0,0.55);
     }
     .file-card-top { display: flex; align-items: center; justify-content: space-between; }
     .file-card-icon { font-size: 32px; }
     .file-card-name { font-size: 15px; font-weight: 700; color: var(--text); word-break: break-all; }
     .file-card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
-    .file-card-actions { display: flex; gap: 8px; margin-top: auto; }
+    .file-card-actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+
+    /* Dense Table List View */
+    .files-table-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      overflow-x: auto;
+      margin-bottom: 40px;
+      box-shadow: var(--shadow-card);
+    }
+    .files-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+    .files-table th {
+      background: rgba(0,0,0,0.3);
+      padding: 14px 18px;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--surface-border);
+    }
+    .files-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+    .files-table tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
 
     .badge { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 99px; }
     .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
@@ -499,12 +550,36 @@
       </div>
     </div>
 
-    <!-- Files Section -->
+    <!-- Files Section Header with View Toggle -->
     <div class="section-title-row">
       <h3 class="section-title" id="filesSectionTitle"><span>📄</span> All Storage Objects (<span id="filesCount">0</span>)</h3>
+      <div class="view-toggle-btn-group">
+        <button class="view-btn active" id="btnViewGrid" onclick="changeViewMode('grid')">🔲 Grid Cards</button>
+        <button class="view-btn" id="btnViewList" onclick="changeViewMode('list')">📋 List Table</button>
+      </div>
     </div>
+
+    <!-- Container for Grid Cards -->
     <div class="files-grid" id="filesContainer">
-      <!-- Files loaded dynamically from permanent IndexedDB / localStorage -->
+      <!-- File Cards rendered here -->
+    </div>
+
+    <!-- Container for Table List View (Toggleable) -->
+    <div class="files-table-wrap" id="filesTableContainer" style="display: none;">
+      <table class="files-table">
+        <thead>
+          <tr>
+            <th>Object Name</th>
+            <th>Location / Folder</th>
+            <th>Payload Size</th>
+            <th>Replication & Integrity</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="filesTableBody">
+          <!-- Rows rendered here -->
+        </tbody>
+      </table>
     </div>
   </main>
 
@@ -569,6 +644,7 @@
     let loadedFiles = [];
     let loadedFolders = [];
     let activeFolderId = null; // null = root
+    let currentViewMode = 'grid'; // 'grid' or 'list'
 
     // Trigger File Explorer
     function triggerFilePicker() {
@@ -580,6 +656,13 @@
     function triggerFolderPicker() {
       document.getElementById('folderPickerInput').value = '';
       document.getElementById('folderPickerInput').click();
+    }
+
+    function changeViewMode(mode) {
+      currentViewMode = mode;
+      document.getElementById('btnViewGrid').classList.toggle('active', mode === 'grid');
+      document.getElementById('btnViewList').classList.toggle('active', mode === 'list');
+      renderFiles();
     }
 
     async function loadData() {
@@ -610,7 +693,7 @@
         document.getElementById('folderBanner').style.display = 'none';
         document.getElementById('foldersSection').style.display = 'block';
       } else {
-        const folder = loadedFolders.find(f => f.id === activeFolderId);
+        const folder = (loadedFolders || []).find(f => f.id === activeFolderId);
         const folderName = folder ? folder.name : 'Folder';
         bar.innerHTML = `
           <span class="crumb-link" onclick="navigateToFolder(null)"><span>📁</span> My Files</span>
@@ -618,7 +701,7 @@
           <span class="crumb-active"><span>📂</span> ${folderName}</span>
         `;
 
-        const filesInFolder = loadedFiles.filter(f => f.folderId === activeFolderId);
+        const filesInFolder = (loadedFiles || []).filter(f => f.folderId === activeFolderId);
         const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || f.total_size || f.size || 0), 0);
         document.getElementById('folderBannerName').textContent = folderName;
         document.getElementById('folderBannerDesc').textContent = `Contains ${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)} distributed across cluster nodes`;
@@ -677,8 +760,12 @@
     }
 
     function renderFiles() {
-      const container = document.getElementById('filesContainer');
-      container.innerHTML = '';
+      const gridContainer = document.getElementById('filesContainer');
+      const tableContainer = document.getElementById('filesTableContainer');
+      const tableBody = document.getElementById('filesTableBody');
+      
+      gridContainer.innerHTML = '';
+      tableBody.innerHTML = '';
 
       let filesToShow = loadedFiles || [];
 
@@ -706,7 +793,9 @@
       document.getElementById('filesCount').textContent = filesToShow.length;
 
       if (filesToShow.length === 0) {
-        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; color: var(--text-muted);">
+        gridContainer.style.display = 'grid';
+        tableContainer.style.display = 'none';
+        gridContainer.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; color: var(--text-muted);">
           <div style="font-size: 36px; margin-bottom: 10px;">📂</div>
           <div style="font-weight: 700; font-size: 16px;">No files found in this view</div>
           <div style="font-size: 13.5px; margin-top: 4px;">Click "📤 Upload Document / Video" or "📁 Upload Folder" to add data.</div>
@@ -714,53 +803,105 @@
         return;
       }
 
-      filesToShow.forEach(file => {
-        try {
-          const filename = file.name || file.filename || 'Storage_Object';
-          const fileId = file.id || ('vault-file-' + Math.random().toString(36).substring(2, 8));
-          const sizeBytes = file.sizeBytes || file.total_size || file.size || 0;
-          const sizeFormatted = file.sizeFormatted || window.vaultStore.formatBytes(sizeBytes);
-          const ext = (filename.split('.').pop() || '').toLowerCase();
-          const icon = file.icon || window.vaultStore.getIconForExt(ext);
-          const status = file.status || 'Healthy';
-          const hash = file.hash || file.file_hash || 'SHA-256 Verified';
-          const chunksCount = file.chunksCount || file.total_chunks || (Array.isArray(file.chunks) ? file.chunks.length : 1);
-          const repFactor = file.replicationFactor || file.replication_factor || 3;
-          const isSmall = file.isSmallFileBroadcast || repFactor === 9 || sizeBytes < 5242880;
+      if (currentViewMode === 'grid') {
+        gridContainer.style.display = 'grid';
+        tableContainer.style.display = 'none';
 
-          const card = document.createElement('div');
-          card.className = 'file-card';
-          card.onclick = () => openDrawer(file);
+        filesToShow.forEach(file => {
+          try {
+            const filename = file.name || file.filename || 'Storage_Object';
+            const fileId = file.id || ('vault-file-' + Math.random().toString(36).substring(2, 8));
+            const sizeBytes = file.sizeBytes || file.total_size || file.size || 0;
+            const sizeFormatted = file.sizeFormatted || window.vaultStore.formatBytes(sizeBytes);
+            const ext = (filename.split('.').pop() || '').toLowerCase();
+            const icon = file.icon || window.vaultStore.getIconForExt(ext);
+            const status = file.status || 'Healthy';
+            const hash = file.hash || file.file_hash || 'SHA-256 Verified';
+            const chunksCount = file.chunksCount || file.total_chunks || (Array.isArray(file.chunks) ? file.chunks.length : 1);
+            const repFactor = file.replicationFactor || file.replication_factor || 3;
+            const isSmall = file.isSmallFileBroadcast || repFactor === 9 || sizeBytes < 5242880;
 
-          card.innerHTML = `
-            <div class="file-card-top">
-              <div class="file-card-icon">${icon}</div>
-              <span class="badge ${status === 'Healthy' ? 'badge-success' : 'badge-warning'}">${status}</span>
-            </div>
+            const card = document.createElement('div');
+            card.className = 'file-card';
+            card.onclick = () => openDrawer(file);
 
-            <div class="file-card-name">${filename}</div>
-            <div class="file-card-meta">
-              <span>${sizeFormatted}</span>
-              <span>${isSmall ? 'Single Block' : chunksCount + ' Chunks (4MB)'}</span>
-            </div>
+            card.innerHTML = `
+              <div class="file-card-top">
+                <div class="file-card-icon">${icon}</div>
+                <span class="badge ${status === 'Healthy' ? 'badge-success' : 'badge-warning'}">${status}</span>
+              </div>
 
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <span class="badge badge-rep">${isSmall ? '🌐 9× All Nodes' : repFactor + '× Quorum'}</span>
-              <span class="badge" style="background: rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 10px;">SHA-256 ✓</span>
-            </div>
+              <div class="file-card-name">${filename}</div>
+              <div class="file-card-meta">
+                <span>${sizeFormatted}</span>
+                <span>${isSmall ? 'Single Block' : chunksCount + ' Chunks (4MB)'}</span>
+              </div>
 
-            <div class="file-card-actions" onclick="event.stopPropagation()">
-              <button class="btn btn-sm btn-secondary" onclick="window.vaultStore.downloadFile('${fileId}')" title="Download Real Reassembled File">⬇️ Download</button>
-              <button class="btn btn-sm btn-secondary" onclick="verifyFile('${fileId}')" title="Verify SHA-256 Checksums">🔍 Verify</button>
-              <button class="btn btn-sm btn-secondary" onclick="shareFile('${fileId}')" title="Copy Share Link">🔗 Share</button>
-              <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.3);" onclick="deleteFile('${fileId}')" title="Delete Object">🗑️</button>
-            </div>
-          `;
-          container.appendChild(card);
-        } catch (cardErr) {
-          console.error('Error rendering file card:', cardErr, file);
-        }
-      });
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="badge badge-rep">${isSmall ? '🌐 9× All Nodes' : repFactor + '× Quorum'}</span>
+                <span class="badge" style="background: rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 10px;">SHA-256 ✓</span>
+              </div>
+
+              <div class="file-card-actions" onclick="event.stopPropagation()">
+                <button class="btn btn-sm btn-secondary" onclick="window.vaultStore.downloadFile('${fileId}')" title="Download Real Reassembled File">⬇️ Download</button>
+                <button class="btn btn-sm btn-secondary" onclick="verifyFile('${fileId}')" title="Verify SHA-256 Checksums">🔍 Verify</button>
+                <button class="btn btn-sm btn-secondary" onclick="shareFile('${fileId}')" title="Copy Share Link">🔗 Share</button>
+                <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.3);" onclick="deleteFile('${fileId}')" title="Delete Object">🗑️</button>
+              </div>
+            `;
+            gridContainer.appendChild(card);
+          } catch (cardErr) {
+            console.error('Error rendering file card:', cardErr, file);
+          }
+        });
+      } else {
+        // Table List View
+        gridContainer.style.display = 'none';
+        tableContainer.style.display = 'block';
+
+        filesToShow.forEach(file => {
+          try {
+            const filename = file.name || file.filename || 'Storage_Object';
+            const fileId = file.id || ('vault-file-' + Math.random().toString(36).substring(2, 8));
+            const sizeBytes = file.sizeBytes || file.total_size || file.size || 0;
+            const sizeFormatted = file.sizeFormatted || window.vaultStore.formatBytes(sizeBytes);
+            const ext = (filename.split('.').pop() || '').toLowerCase();
+            const icon = file.icon || window.vaultStore.getIconForExt(ext);
+            const repFactor = file.replicationFactor || file.replication_factor || 3;
+            const isSmall = file.isSmallFileBroadcast || repFactor === 9 || sizeBytes < 5242880;
+
+            const folderObj = (loadedFolders || []).find(f => f.id === file.folderId);
+            const folderLabel = folderObj ? `📂 ${folderObj.name}` : '📁 Root';
+
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => openDrawer(file);
+
+            tr.innerHTML = `
+              <td style="font-weight: 700; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">${icon}</span>
+                <span>${filename}</span>
+              </td>
+              <td><span style="color: var(--text-muted);">${folderLabel}</span></td>
+              <td>${sizeFormatted}</td>
+              <td>
+                <span class="badge badge-rep">${isSmall ? '🌐 9× All Nodes' : repFactor + '× Quorum'}</span>
+              </td>
+              <td onclick="event.stopPropagation()">
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-sm btn-secondary" onclick="window.vaultStore.downloadFile('${fileId}')">⬇️ Download</button>
+                  <button class="btn btn-sm btn-secondary" onclick="verifyFile('${fileId}')">🔍</button>
+                  <button class="btn btn-sm btn-secondary" onclick="shareFile('${fileId}')">🔗</button>
+                  <button class="btn btn-sm btn-secondary" style="color: var(--danger); border-color: rgba(255,23,68,0.3);" onclick="deleteFile('${fileId}')">🗑️</button>
+                </div>
+              </td>
+            `;
+            tableBody.appendChild(tr);
+          } catch (trErr) {
+            console.error('Error rendering table row:', trErr, file);
+          }
+        });
+      }
     }
 
     function filterCategory(cat) {
@@ -783,7 +924,7 @@
     async function handleSingleFileInput(file) {
       if (!file) return;
 
-      const activeFolder = activeFolderId ? loadedFolders.find(f => f.id === activeFolderId) : null;
+      const activeFolder = activeFolderId ? (loadedFolders || []).find(f => f.id === activeFolderId) : null;
       document.getElementById('uploadModalTitle').textContent = activeFolder
         ? `Upload into "${activeFolder.name}"`
         : `Uploading "${file.name}"`;
@@ -902,7 +1043,7 @@
     }
 
     async function deleteFolder(folderId) {
-      const folder = loadedFolders.find(f => f.id === folderId);
+      const folder = (loadedFolders || []).find(f => f.id === folderId);
       const name = folder ? folder.name : 'Folder';
       if (confirm(`Are you sure you want to delete folder "${name}" and all files inside it?`)) {
         await window.vaultStore.deleteFolder(folderId, true);
@@ -913,7 +1054,7 @@
     }
 
     async function downloadFolderZip(folderId) {
-      const folder = loadedFolders.find(f => f.id === folderId);
+      const folder = (loadedFolders || []).find(f => f.id === folderId);
       const name = folder ? folder.name : 'Folder';
       showToast(`📦 Bundling "${name}" into .ZIP from distributed storage...`, 'info');
       try {

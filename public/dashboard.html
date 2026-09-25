@@ -371,6 +371,26 @@
         <div class="topology-container">
           <canvas id="clusterCanvas"></canvas>
         </div>
+
+        <!-- Color Code Legend for Multi-Region Nodes -->
+        <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--surface-border); font-size: 12.5px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5722; box-shadow: 0 0 8px #FF5722; display: inline-block;"></span>
+            <span><strong>Center (Coral)</strong>: Gateway API Coordinator (:3000)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #10B981; box-shadow: 0 0 8px #10B981; display: inline-block;"></span>
+            <span><strong>Green Nodes</strong>: Zone 1 (US-East: Alpha, Beta, Gamma)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #8B5CF6; box-shadow: 0 0 8px #8B5CF6; display: inline-block;"></span>
+            <span><strong>Purple Nodes</strong>: Zone 2 (US-West: Delta, Epsilon, Zeta)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #F59E0B; box-shadow: 0 0 8px #F59E0B; display: inline-block;"></span>
+            <span><strong>Amber Nodes</strong>: Zone 3 (Cross-Region: Eta, Theta, Iota)</span>
+          </div>
+        </div>
       </div>
 
       <div class="panel-card">
