@@ -1,11 +1,10 @@
 /**
  * ============================================================================
- * 🛡️ VAULT DISTRIBUTED OBJECT STORAGE — PERSISTENCE & CRYPTO ENGINE (v5.0)
+ * 🛡️ VAULT DISTRIBUTED OBJECT STORAGE — PERSISTENCE & CRYPTO ENGINE (v5.1)
  * Multi-layer persistence: IndexedDB (Real Blobs/Videos/Docs) + localStorage + Supabase.
  * Real Web Crypto SHA-256 Hashing, Configurable 4MB/8MB Sharding, Zero Assumptions.
- * Google Drive-style Virtual Hierarchical Folder Engine with .ZIP Folder Bundler.
- * Small File Threshold: Full Broadcast across Maximum Cluster Nodes (9 Nodes).
- * Large File Policy: 4MB Chunks distributed across Availability Zone Quorums.
+ * Google Drive-style Virtual Hierarchical Folder Engine & Folder .ZIP Bundler.
+ * Native Folder Upload (webkitdirectory) + Single/Multi-file Upload.
  * ============================================================================
  */
 
@@ -32,7 +31,7 @@ const CLUSTER_NODES = [
   { id: 'node-iota', name: 'Node Iota (:9009)', zone: 'ap-south-1b', rack: 'Rack-05' }
 ];
 
-// Seed Folders
+// Seed Folders (Pre-populated)
 const SEED_FOLDERS = [
   {
     id: 'folder-seed-01',
@@ -84,7 +83,7 @@ const SEED_FILES = [
         nodes: CLUSTER_NODES.map(n => n.name)
       }
     ],
-    sampleText: '{\n  "project": "Vault Distributed Storage v5",\n  "durability": "99.999999999%",\n  "folder": "Project Documents",\n  "chunk_size_bytes": 4194304,\n  "small_file_threshold_bytes": 5242880,\n  "small_file_policy": "Full Broadcast Across All 9 Nodes",\n  "large_file_policy": "4MB Dynamic Chunking with Multi-AZ Quorum",\n  "nodes": ["Node Alpha :9001", "Node Beta :9002", "Node Gamma :9003", "Node Delta :9004", "Node Epsilon :9005", "Node Zeta :9006", "Node Eta :9007", "Node Theta :9008", "Node Iota :9009"],\n  "anti_bit_rot": "SHA-256 Scrubber Active",\n  "supabase_sync": "https://csrhmocmponregwceknr.supabase.co"\n}'
+    sampleText: '{\n  "project": "Vault Distributed Storage v5.1",\n  "durability": "99.999999999%",\n  "folder": "Project Documents",\n  "chunk_size_bytes": 4194304,\n  "small_file_threshold_bytes": 5242880,\n  "small_file_policy": "Full Broadcast Across All 9 Nodes",\n  "large_file_policy": "4MB Dynamic Chunking with Multi-AZ Quorum",\n  "nodes": ["Node Alpha :9001", "Node Beta :9002", "Node Gamma :9003", "Node Delta :9004", "Node Epsilon :9005", "Node Zeta :9006", "Node Eta :9007", "Node Theta :9008", "Node Iota :9009"],\n  "anti_bit_rot": "SHA-256 Scrubber Active",\n  "supabase_sync": "https://csrhmocmponregwceknr.supabase.co"\n}'
   },
   {
     id: 'vault-seed-02',
@@ -206,7 +205,7 @@ class VaultStorageManager {
         };
 
         request.onerror = (err) => {
-          console.warn('IndexedDB initialization failed, utilizing LocalStorage fallback:', err);
+          console.warn('IndexedDB initialization error, utilizing LocalStorage fallback:', err);
           this.isReady = true;
           resolve(false);
         };
@@ -218,32 +217,36 @@ class VaultStorageManager {
     });
   }
 
-  // Seed storage on very first run
+  // Seed storage and migrate old keys seamlessly
   async seedInitialIfEmpty() {
     try {
-      if (!this.db) return;
-      const count = await new Promise((res) => {
-        const tx = this.db.transaction([STORE_FILES], 'readonly');
-        const req = tx.objectStore(STORE_FILES).count();
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => res(0);
-      });
+      const existingFiles = this.getLocalStorageFiles();
+      const existingFolders = this.getLocalStorageFolders();
 
-      if (count === 0) {
-        const tx = this.db.transaction([STORE_FILES, STORE_FOLDERS], 'readwrite');
-        const fileStore = tx.objectStore(STORE_FILES);
-        const folderStore = tx.objectStore(STORE_FOLDERS);
-        
-        SEED_FILES.forEach(f => fileStore.put(f));
-        SEED_FOLDERS.forEach(f => folderStore.put(f));
-        
-        await new Promise((res) => {
-          tx.oncomplete = res;
-          tx.onerror = res;
+      if (this.db) {
+        const count = await new Promise((res) => {
+          const tx = this.db.transaction([STORE_FILES], 'readonly');
+          const req = tx.objectStore(STORE_FILES).count();
+          req.onsuccess = () => res(req.result);
+          req.onerror = () => res(0);
         });
-        localStorage.setItem('vault_persisted_files_v5', JSON.stringify(SEED_FILES));
-        localStorage.setItem('vault_persisted_folders_v5', JSON.stringify(SEED_FOLDERS));
+
+        if (count === 0) {
+          const tx = this.db.transaction([STORE_FILES, STORE_FOLDERS], 'readwrite');
+          const fileStore = tx.objectStore(STORE_FILES);
+          const folderStore = tx.objectStore(STORE_FOLDERS);
+          
+          existingFiles.forEach(f => fileStore.put(f));
+          existingFolders.forEach(f => folderStore.put(f));
+          
+          await new Promise((res) => {
+            tx.oncomplete = res;
+            tx.onerror = res;
+          });
+        }
       }
+      localStorage.setItem('vault_persisted_files_v5', JSON.stringify(existingFiles));
+      localStorage.setItem('vault_persisted_folders_v5', JSON.stringify(existingFolders));
     } catch (e) {
       console.warn('Seeding warning:', e);
     }
@@ -318,7 +321,11 @@ class VaultStorageManager {
   getLocalStorageFolders() {
     try {
       const data = localStorage.getItem('vault_persisted_folders_v5');
-      return data ? JSON.parse(data) : SEED_FOLDERS;
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return SEED_FOLDERS;
     } catch (e) {
       return SEED_FOLDERS;
     }
@@ -386,7 +393,6 @@ class VaultStorageManager {
 
     onProgress(`Bundling ${filesInFolder.length} files from cluster...`, 20);
 
-    // If JSZip is available via CDN
     if (window.JSZip) {
       const zip = new window.JSZip();
       const folderZip = zip.folder(folder.name);
@@ -423,7 +429,6 @@ class VaultStorageManager {
       this.logActivity(`Downloaded full folder archive "${folder.name}.zip" (${filesInFolder.length} objects)`, '📦');
       return true;
     } else {
-      // Fallback if JSZip is not loaded: download files individually
       for (const file of filesInFolder) {
         await this.downloadFile(file.id);
         await new Promise(r => setTimeout(r, 300));
@@ -436,7 +441,6 @@ class VaultStorageManager {
   // FILE METADATA & BLOB STORAGE API
   // =========================================================================
 
-  // Put file metadata into IndexedDB & localStorage
   async putFileMetadata(fileObj) {
     await this.initPromise;
     return new Promise((resolve) => {
@@ -463,7 +467,6 @@ class VaultStorageManager {
     });
   }
 
-  // Store binary Blob
   async putFileBlob(id, blob) {
     await this.initPromise;
     return new Promise((resolve) => {
@@ -483,7 +486,6 @@ class VaultStorageManager {
     });
   }
 
-  // Retrieve binary Blob
   async getFileBlob(id) {
     await this.initPromise;
     return new Promise((resolve) => {
@@ -502,7 +504,6 @@ class VaultStorageManager {
     });
   }
 
-  // Retrieve all files metadata permanently
   async getAllFiles() {
     await this.initPromise;
     return new Promise((resolve) => {
@@ -529,8 +530,20 @@ class VaultStorageManager {
 
   getLocalStorageFiles() {
     try {
-      const data = localStorage.getItem('vault_persisted_files_v5');
-      return data ? JSON.parse(data) : SEED_FILES;
+      const dataV5 = localStorage.getItem('vault_persisted_files_v5');
+      if (dataV5) {
+        const parsed = JSON.parse(dataV5);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const dataV4 = localStorage.getItem('vault_persisted_files_v4');
+      if (dataV4) {
+        const parsed = JSON.parse(dataV4);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localStorage.setItem('vault_persisted_files_v5', JSON.stringify(parsed));
+          return parsed;
+        }
+      }
+      return SEED_FILES;
     } catch (e) {
       return SEED_FILES;
     }
@@ -553,7 +566,7 @@ class VaultStorageManager {
         const tx = this.db.transaction([STORE_FILES], 'readonly');
         const req = tx.objectStore(STORE_FILES).getAll();
         req.onsuccess = () => {
-          if (req.result) {
+          if (req.result && req.result.length > 0) {
             localStorage.setItem('vault_persisted_files_v5', JSON.stringify(req.result));
           }
         };
@@ -562,7 +575,7 @@ class VaultStorageManager {
   }
 
   /**
-   * High-Performance Distributed Upload with Folder Assignment
+   * Distributed Upload (Small File Broadcast / Large File Sharding)
    */
   async uploadFile(file, replicationFactor = 3, onProgress = () => {}, folderId = null) {
     await this.initPromise;
@@ -584,7 +597,6 @@ class VaultStorageManager {
     const chunks = [];
 
     if (isSmallFile) {
-      // SMALL FILE POLICY: Maximize Availability by Broadcasting to ALL 9 Nodes
       onProgress('Step 3: Small file policy active — Slicing 1 atomic block for all 9 nodes...', 60);
       
       const smallChunkSlice = await file.slice(0, file.size).arrayBuffer();
@@ -599,7 +611,6 @@ class VaultStorageManager {
       
       onProgress('Step 4: Broadcasting full replica across all 9 cluster nodes...', 90);
     } else {
-      // LARGE FILE POLICY: High-Throughput 4MB Chunk Sharding across Quorum Nodes
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE_BYTES);
       onProgress(`Step 3: Partitioning into ${totalChunks} high-throughput (4MB) chunks...`, 50);
 
@@ -609,7 +620,6 @@ class VaultStorageManager {
         const chunkSlice = await file.slice(offset, chunkEnd).arrayBuffer();
         const chunkHash = await this.computeSHA256(chunkSlice);
 
-        // Multi-zone placement
         const assignedNodes = [];
         for (let r = 0; r < Math.min(replicationFactor, CLUSTER_NODES.length); r++) {
           const nodeIdx = (i * replicationFactor + r) % CLUSTER_NODES.length;
@@ -681,7 +691,6 @@ class VaultStorageManager {
     const file = all.find(f => f.id === fileId);
     if (!file) return;
 
-    // Check if binary blob is in IndexedDB
     const blob = await this.getFileBlob(fileId);
     if (blob) {
       const url = URL.createObjectURL(blob);

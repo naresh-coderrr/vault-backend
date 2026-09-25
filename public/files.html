@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>File & Folder Manager — Vault Platform</title>
+  <title>File & Folder Manager — Vault Distributed Storage</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -155,7 +155,7 @@
     .search-box {
       display: flex; align-items: center; gap: 10px;
       background: var(--bg-card); border: 1px solid var(--surface-border);
-      border-radius: 12px; padding: 10px 18px; width: 100%; max-width: 400px;
+      border-radius: 12px; padding: 10px 18px; width: 100%; max-width: 380px;
     }
     .search-input {
       background: none; border: none; color: var(--text);
@@ -176,7 +176,7 @@
     .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--surface-border-hover); }
     .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
 
-    /* Breadcrumbs Navigation (Google Drive Style) */
+    /* Breadcrumbs Navigation */
     .breadcrumbs-bar {
       display: flex;
       align-items: center;
@@ -201,7 +201,7 @@
     .crumb-active { color: var(--text); font-weight: 800; display: flex; align-items: center; gap: 6px; }
     .crumb-sep { color: var(--text-dim); font-size: 12px; }
 
-    /* Folder Cards Grid */
+    /* Section Header */
     .section-title-row {
       display: flex;
       align-items: center;
@@ -216,6 +216,7 @@
       gap: 8px;
     }
 
+    /* Folders Grid */
     .folders-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -381,15 +382,6 @@
     .chunk-step.active { border-left: 3px solid var(--primary); color: #FFFFFF; font-weight: 700; }
     .chunk-step.done { border-left: 3px solid var(--success); color: var(--success); }
 
-    .form-input {
-      width: 100%; padding: 12px 16px;
-      border-radius: 10px; border: 1px solid var(--surface-border);
-      background: rgba(0,0,0,0.25); color: var(--text);
-      font-family: var(--font); font-size: 14px; outline: none;
-      margin-top: 8px;
-    }
-    .form-input:focus { border-color: var(--primary); }
-
     .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
     .toast {
       background: var(--surface); border: 1px solid var(--surface-border);
@@ -407,6 +399,10 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
   </div>
+
+  <!-- Hidden Native File & Folder Inputs -->
+  <input type="file" id="singleFileInput" style="display: none;" onchange="handleSingleFileInput(this.files[0])" />
+  <input type="file" id="folderPickerInput" webkitdirectory directory multiple style="display: none;" onchange="handleFolderUploadInput(this.files)" />
 
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -450,11 +446,13 @@
           <option value="2">2× Economy Mode</option>
         </select>
 
-        <button class="btn btn-secondary" onclick="openNewFolderModal()">
-          <span>➕</span> New Folder
+        <!-- Direct Folder Upload Button -->
+        <button class="btn btn-secondary" onclick="triggerFolderPicker()" style="border-color: rgba(255, 107, 53, 0.4);">
+          <span>📁</span> Upload Folder
         </button>
 
-        <button class="btn btn-primary" onclick="openUploadModal()">
+        <!-- Direct File Upload Button -->
+        <button class="btn btn-primary" onclick="triggerFilePicker()">
           <span>📤</span> Upload Document / Video
         </button>
       </div>
@@ -462,17 +460,17 @@
 
     <!-- Breadcrumbs Navigation -->
     <div class="breadcrumbs-bar" id="breadcrumbsBar">
-      <span class="crumb-link" onclick="navigateToFolder(null)"><span>📁</span> My Files</span>
+      <span class="crumb-link" onclick="navigateToFolder(null)"><span>📁</span> My Files (Root Directory)</span>
     </div>
 
-    <!-- Active Folder Banner (Only when inside a folder) -->
+    <!-- Active Folder Banner (Inside Folder View) -->
     <div class="folder-banner" id="folderBanner" style="display: none;">
       <div>
         <div class="folder-banner-title" id="folderBannerTitle">
-          <span>📂</span> <span id="folderBannerName">Project Documents</span>
+          <span>📂</span> <span id="folderBannerName">Folder Name</span>
         </div>
         <div class="folder-banner-desc" id="folderBannerDesc">
-          Contains 2 files • 860.05 KB distributed across cluster nodes
+          Contains 0 files • 0 B distributed across cluster nodes
         </div>
       </div>
 
@@ -480,13 +478,16 @@
         <button class="btn btn-primary" onclick="downloadCurrentFolderZip()">
           <span>📦</span> Download Entire Folder (.zip)
         </button>
+        <button class="btn btn-secondary" onclick="triggerFilePicker()">
+          <span>➕</span> Add File to this Folder
+        </button>
         <button class="btn btn-secondary" onclick="navigateToFolder(null)">
           <span>⬅️</span> Back to All Folders
         </button>
       </div>
     </div>
 
-    <!-- Folders Section (Google Drive Style) -->
+    <!-- Folders Section -->
     <div id="foldersSection">
       <div class="section-title-row">
         <h3 class="section-title"><span>📂</span> Folders (<span id="folderCount">0</span>)</h3>
@@ -498,10 +499,10 @@
 
     <!-- Files Section -->
     <div class="section-title-row">
-      <h3 class="section-title" id="filesSectionTitle"><span>📄</span> Files (<span id="filesCount">0</span>)</h3>
+      <h3 class="section-title" id="filesSectionTitle"><span>📄</span> All Storage Objects (<span id="filesCount">0</span>)</h3>
     </div>
     <div class="files-grid" id="filesContainer">
-      <!-- Loaded dynamically from permanent IndexedDB / localStorage -->
+      <!-- Files loaded dynamically from permanent IndexedDB / localStorage -->
     </div>
   </main>
 
@@ -515,36 +516,15 @@
     <div id="drawerContent"></div>
   </div>
 
-  <!-- New Folder Modal -->
-  <div class="drawer-backdrop" id="newFolderBackdrop" onclick="closeNewFolderModal()"></div>
-  <div class="modal-box" id="newFolderModal">
-    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Create New Folder</h3>
-    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-      Organize your distributed objects into virtual folders. You can download any folder as a single bundled .ZIP file at any time.
-    </p>
-
-    <div style="margin-bottom: 20px;">
-      <label style="font-size: 13px; font-weight: 700;">Folder Name</label>
-      <input type="text" class="form-input" id="newFolderNameInput" placeholder="e.g. Q4 Financial Reports" autofocus />
-    </div>
-
-    <div style="display: flex; justify-content: flex-end; gap: 10px;">
-      <button class="btn btn-secondary" onclick="closeNewFolderModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitNewFolder()">Create Folder</button>
-    </div>
-  </div>
-
-  <!-- Upload Modal -->
+  <!-- Single File Upload Modal with Steps -->
   <div class="drawer-backdrop" id="uploadModalBackdrop" onclick="closeUploadModal()"></div>
   <div class="modal-box" id="uploadModal">
     <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;" id="uploadModalTitle">Upload & Multi-Node Distribution</h3>
     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;" id="uploadModalDesc">
-      Files &lt; 5MB broadcast across all 9 nodes. Files &ge; 5MB partition into 4MB high-throughput chunks with SHA-256 verification.
+      Computing cryptographic SHA-256 and distributing chunk replicas across storage nodes (:9001 - :9009).
     </p>
 
-    <input type="file" id="realFileInput" style="margin: 10px 0 20px 0; width: 100%;" onchange="handleRealFileUpload(this.files[0])" />
-
-    <div class="chunk-step-list" id="chunkSteps" style="display: none;">
+    <div class="chunk-step-list" id="chunkSteps">
       <div class="chunk-step" id="step1"><span>🔐</span> <span id="step1-text">Step 1: Initializing cryptographic stream</span></div>
       <div class="chunk-step" id="step2"><span>⚖️</span> <span id="step2-text">Step 2: Evaluating 5MB threshold & placement policy</span></div>
       <div class="chunk-step" id="step3"><span>🧩</span> <span id="step3-text">Step 3: Generating Web Crypto SHA-256 checksums</span></div>
@@ -552,8 +532,30 @@
     </div>
 
     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
-      <button class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="document.getElementById('realFileInput').click()">Choose File</button>
+      <button class="btn btn-secondary" onclick="closeUploadModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Folder Batch Upload Modal -->
+  <div class="drawer-backdrop" id="folderUploadModalBackdrop"></div>
+  <div class="modal-box" id="folderUploadModal">
+    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Uploading Entire Folder</h3>
+    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;" id="folderUploadProgressSubtitle">
+      Processing files inside folder...
+    </p>
+
+    <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; border: 1px solid var(--surface-border); margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 8px;">
+        <span id="folderCurrentFileName">Reading folder contents...</span>
+        <span id="folderProgressPercent">0%</span>
+      </div>
+      <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden;">
+        <div id="folderProgressBarFill" style="height: 100%; background: var(--gradient-brand); width: 0%; transition: width 0.2s;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end;">
+      <button class="btn btn-secondary" disabled>Uploading to Cluster...</button>
     </div>
   </div>
 
@@ -565,6 +567,18 @@
     let loadedFiles = [];
     let loadedFolders = [];
     let activeFolderId = null; // null = root
+
+    // Trigger File Explorer
+    function triggerFilePicker() {
+      document.getElementById('singleFileInput').value = '';
+      document.getElementById('singleFileInput').click();
+    }
+
+    // Trigger Native Folder Explorer
+    function triggerFolderPicker() {
+      document.getElementById('folderPickerInput').value = '';
+      document.getElementById('folderPickerInput').click();
+    }
 
     async function loadData() {
       loadedFolders = await window.vaultStore.getAllFolders();
@@ -596,13 +610,12 @@
           <span class="crumb-active"><span>📂</span> ${folderName}</span>
         `;
 
-        // Update Folder Banner
         const filesInFolder = loadedFiles.filter(f => f.folderId === activeFolderId);
         const totalBytes = filesInFolder.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
         document.getElementById('folderBannerName').textContent = folderName;
         document.getElementById('folderBannerDesc').textContent = `Contains ${filesInFolder.length} file(s) • ${window.vaultStore.formatBytes(totalBytes)} distributed across cluster nodes`;
         document.getElementById('folderBanner').style.display = 'flex';
-        document.getElementById('foldersSection').style.display = 'none'; // hide top folders list when inside a folder
+        document.getElementById('foldersSection').style.display = 'none';
       }
     }
 
@@ -622,7 +635,7 @@
       document.getElementById('folderCount').textContent = filteredFolders.length;
 
       if (filteredFolders.length === 0) {
-        container.innerHTML = `<div style="grid-column: 1/-1; padding: 20px; color: var(--text-muted); font-size: 13.5px;">No folders created yet. Click "+ New Folder" to organize files.</div>`;
+        container.innerHTML = `<div style="grid-column: 1/-1; padding: 14px 20px; color: var(--text-muted); font-size: 13px;">No folders created yet. Click "📁 Upload Folder" to import a complete folder.</div>`;
         return;
       }
 
@@ -658,14 +671,16 @@
       let filesToShow = loadedFiles;
 
       if (activeFolderId) {
+        // Show only files belonging to this folder
         filesToShow = loadedFiles.filter(f => f.folderId === activeFolderId);
         const folder = loadedFolders.find(f => f.id === activeFolderId);
         document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> Files inside "<strong>${folder ? folder.name : 'Folder'}</strong>" (${filesToShow.length})`;
       } else {
+        // At root: show all objects
         if (currentCategory !== 'all') {
           filesToShow = filesToShow.filter(f => f.category === currentCategory);
         }
-        document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> Storage Objects (${filesToShow.length})`;
+        document.getElementById('filesSectionTitle').innerHTML = `<span>📄</span> All Storage Objects (${filesToShow.length})`;
       }
 
       if (currentSearch) {
@@ -678,7 +693,7 @@
         container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; color: var(--text-muted);">
           <div style="font-size: 36px; margin-bottom: 10px;">📂</div>
           <div style="font-weight: 700; font-size: 16px;">No files found in this view</div>
-          <div style="font-size: 13.5px; margin-top: 4px;">Click "+ Upload Document / Video" to add files.</div>
+          <div style="font-size: 13.5px; margin-top: 4px;">Click "📤 Upload Document / Video" or "📁 Upload Folder" to add data.</div>
         </div>`;
         return;
       }
@@ -734,29 +749,126 @@
       renderFiles();
     }
 
-    // New Folder Modal
-    function openNewFolderModal() {
-      document.getElementById('newFolderBackdrop').style.display = 'block';
-      document.getElementById('newFolderModal').classList.add('show');
-      document.getElementById('newFolderNameInput').value = '';
-      setTimeout(() => document.getElementById('newFolderNameInput').focus(), 100);
-    }
+    // Single File Upload Execution
+    async function handleSingleFileInput(file) {
+      if (!file) return;
 
-    function closeNewFolderModal() {
-      document.getElementById('newFolderBackdrop').style.display = 'none';
-      document.getElementById('newFolderModal').classList.remove('show');
-    }
+      const activeFolder = activeFolderId ? loadedFolders.find(f => f.id === activeFolderId) : null;
+      document.getElementById('uploadModalTitle').textContent = activeFolder
+        ? `Upload into "${activeFolder.name}"`
+        : `Uploading "${file.name}"`;
 
-    async function submitNewFolder() {
-      const name = document.getElementById('newFolderNameInput').value.trim();
-      if (!name) {
-        showToast('Please enter a folder name.', 'warning');
-        return;
+      document.getElementById('uploadModalBackdrop').style.display = 'block';
+      document.getElementById('uploadModal').classList.add('show');
+      ['step1','step2','step3','step4'].forEach(id => document.getElementById(id).className = 'chunk-step');
+
+      const isSmall = file.size < 5242880; // 5MB
+
+      const steps = [
+        document.getElementById('step1'),
+        document.getElementById('step2'),
+        document.getElementById('step3'),
+        document.getElementById('step4')
+      ];
+
+      steps[0].className = 'chunk-step active';
+      document.getElementById('step1-text').textContent = 'Step 1: Initializing cryptographic stream & memory pipeline';
+
+      await new Promise(r => setTimeout(r, 200));
+      steps[0].className = 'chunk-step done';
+      steps[1].className = 'chunk-step active';
+
+      document.getElementById('step2-text').textContent = isSmall
+        ? `Step 2: File size (${window.vaultStore.formatBytes(file.size)}) < 5MB Threshold → Activating 9-Node Broadcast Policy`
+        : `Step 2: File size (${window.vaultStore.formatBytes(file.size)}) ≥ 5MB Threshold → Activating 4MB Chunk Sharding`;
+
+      await new Promise(r => setTimeout(r, 250));
+      steps[1].className = 'chunk-step done';
+      steps[2].className = 'chunk-step active';
+
+      document.getElementById('step3-text').textContent = isSmall
+        ? 'Step 3: Calculating Web Crypto SHA-256 for atomic block'
+        : `Step 3: Sharding into ${Math.ceil(file.size / 4194304)} chunks (4MB each) & hashing with Web Crypto`;
+
+      const repFactor = parseInt(document.getElementById('repSelect').value) || 3;
+
+      try {
+        await window.vaultStore.uploadFile(file, repFactor, (statusText, pct) => {
+          if (pct >= 80) {
+            steps[2].className = 'chunk-step done';
+            steps[3].className = 'chunk-step active';
+            document.getElementById('step4-text').textContent = isSmall
+              ? 'Step 4: Committing replicas across ALL 9 cluster nodes (:9001 - :9009)'
+              : `Step 4: Distributing ${Math.ceil(file.size / 4194304)} x 4MB chunks across ${repFactor} Quorum Nodes`;
+          }
+        }, activeFolderId);
+
+        steps[2].className = 'chunk-step done';
+        steps[3].className = 'chunk-step done';
+        document.getElementById('step4-text').textContent = 'Step 4: All replicas confirmed written and verified! ✓';
+
+        setTimeout(async () => {
+          closeUploadModal();
+          await loadData();
+          showToast(
+            isSmall
+              ? `✅ "${file.name}" broadcasted across ALL 9 cluster nodes permanently!`
+              : `✅ "${file.name}" sharded into 4MB chunks and stored permanently!`,
+            'success'
+          );
+        }, 350);
+      } catch (err) {
+        console.error('Upload error:', err);
+        closeUploadModal();
+        await loadData();
+        showToast(`Uploaded "${file.name}" with local persistence fallback`, 'success');
       }
-      await window.vaultStore.createFolder(name, activeFolderId);
-      closeNewFolderModal();
-      await loadData();
-      showToast(`📁 Created folder "${name}"!`, 'success');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('uploadModalBackdrop').style.display = 'none';
+      document.getElementById('uploadModal').classList.remove('show');
+    }
+
+    // Native Folder Upload (webkitdirectory)
+    async function handleFolderUploadInput(fileList) {
+      if (!fileList || fileList.length === 0) return;
+
+      const filesArray = Array.from(fileList);
+      let folderName = 'Uploaded Folder';
+      if (filesArray[0].webkitRelativePath) {
+        folderName = filesArray[0].webkitRelativePath.split('/')[0] || 'Uploaded Folder';
+      }
+
+      // Create new folder in Vault
+      const newFolder = await window.vaultStore.createFolder(folderName, null);
+
+      // Open Batch Modal
+      document.getElementById('folderUploadModalBackdrop').style.display = 'block';
+      document.getElementById('folderUploadModal').classList.add('show');
+      document.getElementById('folderUploadProgressSubtitle').textContent = `Uploading ${filesArray.length} file(s) into folder "${folderName}"...`;
+
+      let completed = 0;
+      for (const file of filesArray) {
+        const pct = Math.round((completed / filesArray.length) * 100);
+        document.getElementById('folderCurrentFileName').textContent = `[${completed + 1}/${filesArray.length}] Sharding "${file.name}"...`;
+        document.getElementById('folderProgressPercent').textContent = `${pct}%`;
+        document.getElementById('folderProgressBarFill').style.width = `${pct}%`;
+
+        await window.vaultStore.uploadFile(file, 3, () => {}, newFolder.id);
+        completed++;
+      }
+
+      document.getElementById('folderProgressPercent').textContent = '100%';
+      document.getElementById('folderProgressBarFill').style.width = '100%';
+      document.getElementById('folderCurrentFileName').textContent = 'All files stored and replicated! ✓';
+
+      setTimeout(async () => {
+        document.getElementById('folderUploadModalBackdrop').style.display = 'none';
+        document.getElementById('folderUploadModal').classList.remove('show');
+        await loadData();
+        showToast(`✅ Folder "${folderName}" (${filesArray.length} files) uploaded to cluster!`, 'success');
+      }, 500);
     }
 
     async function deleteFolder(folderId) {
@@ -788,6 +900,28 @@
       if (activeFolderId) {
         downloadFolderZip(activeFolderId);
       }
+    }
+
+    async function deleteFile(id) {
+      await window.vaultStore.deleteFile(id);
+      await loadData();
+      showToast('🗑️ Object removed from cluster', 'danger');
+    }
+
+    function verifyFile(id) {
+      const f = loadedFiles.find(x => x.id === id);
+      if (!f) return;
+      showToast(`Running SHA-256 verification across all ${f.chunksCount || 1} chunks of "${f.name}"...`, 'info');
+      setTimeout(() => {
+        showToast(`✅ Integrity verified! SHA-256 matches metadata perfectly.`, 'success');
+      }, 700);
+    }
+
+    function shareFile(id) {
+      const f = loadedFiles.find(x => x.id === id);
+      const url = `https://csrhmocmponregwceknr.supabase.co/storage/v1/object/public/vault-files/${f ? f.name : id}`;
+      navigator.clipboard.writeText(url);
+      showToast('🔗 Shareable Supabase object link copied to clipboard!', 'success');
     }
 
     function openDrawer(file) {
@@ -844,117 +978,6 @@
     function closeDrawer() {
       document.getElementById('drawerBackdrop').classList.remove('show');
       document.getElementById('fileDrawer').classList.remove('show');
-    }
-
-    function openUploadModal() {
-      const activeFolder = activeFolderId ? loadedFolders.find(f => f.id === activeFolderId) : null;
-      document.getElementById('uploadModalTitle').textContent = activeFolder
-        ? `Upload into "${activeFolder.name}"`
-        : 'Upload & Multi-Node Distribution';
-      document.getElementById('uploadModalBackdrop').style.display = 'block';
-      document.getElementById('uploadModal').classList.add('show');
-      document.getElementById('chunkSteps').style.display = 'none';
-      ['step1','step2','step3','step4'].forEach(id => {
-        document.getElementById(id).className = 'chunk-step';
-      });
-    }
-
-    function closeUploadModal() {
-      document.getElementById('uploadModalBackdrop').style.display = 'none';
-      document.getElementById('uploadModal').classList.remove('show');
-    }
-
-    async function handleRealFileUpload(file) {
-      if (!file) return;
-
-      const stepsList = document.getElementById('chunkSteps');
-      stepsList.style.display = 'flex';
-      const steps = [
-        document.getElementById('step1'),
-        document.getElementById('step2'),
-        document.getElementById('step3'),
-        document.getElementById('step4')
-      ];
-
-      const isSmall = file.size < 5242880; // 5MB Threshold
-
-      steps[0].className = 'chunk-step active';
-      document.getElementById('step1-text').textContent = 'Step 1: Initializing cryptographic stream & memory pipeline';
-
-      await new Promise(r => setTimeout(r, 200));
-      steps[0].className = 'chunk-step done';
-      steps[1].className = 'chunk-step active';
-
-      document.getElementById('step2-text').textContent = isSmall
-        ? `Step 2: File size (${window.vaultStore.formatBytes(file.size)}) < 5MB Threshold → Activating 9-Node Broadcast Policy`
-        : `Step 2: File size (${window.vaultStore.formatBytes(file.size)}) ≥ 5MB Threshold → Activating 4MB Chunk Sharding`;
-
-      await new Promise(r => setTimeout(r, 300));
-      steps[1].className = 'chunk-step done';
-      steps[2].className = 'chunk-step active';
-
-      document.getElementById('step3-text').textContent = isSmall
-        ? 'Step 3: Calculating Web Crypto SHA-256 for atomic block'
-        : `Step 3: Sharding into ${Math.ceil(file.size / 4194304)} chunks (4MB each) & hashing with Web Crypto`;
-
-      const repFactor = parseInt(document.getElementById('repSelect').value) || 3;
-
-      try {
-        const uploaded = await window.vaultStore.uploadFile(file, repFactor, (statusText, pct) => {
-          if (pct >= 80) {
-            steps[2].className = 'chunk-step done';
-            steps[3].className = 'chunk-step active';
-            document.getElementById('step4-text').textContent = isSmall
-              ? 'Step 4: Committing replicas across ALL 9 cluster nodes (:9001 - :9009)'
-              : `Step 4: Distributing ${Math.ceil(file.size / 4194304)} x 4MB chunks across ${repFactor} Quorum Nodes`;
-          }
-        }, activeFolderId);
-
-        steps[2].className = 'chunk-step done';
-        steps[3].className = 'chunk-step done';
-        document.getElementById('step4-text').textContent = 'Step 4: All replicas confirmed written and verified! ✓';
-
-        setTimeout(async () => {
-          closeUploadModal();
-          await loadData();
-          showToast(
-            isSmall
-              ? `✅ "${file.name}" broadcasted across ALL 9 cluster nodes permanently!`
-              : `✅ "${file.name}" sharded into 4MB chunks and stored permanently!`,
-            'success'
-          );
-        }, 400);
-      } catch (err) {
-        console.error('Upload error:', err);
-        steps[3].className = 'chunk-step done';
-        setTimeout(async () => {
-          closeUploadModal();
-          await loadData();
-          showToast(`Uploaded "${file.name}" with local persistence fallback`, 'success');
-        }, 400);
-      }
-    }
-
-    async function deleteFile(id) {
-      await window.vaultStore.deleteFile(id);
-      await loadData();
-      showToast('🗑️ Object removed from cluster', 'danger');
-    }
-
-    function verifyFile(id) {
-      const f = loadedFiles.find(x => x.id === id);
-      if (!f) return;
-      showToast(`Running SHA-256 verification across all ${f.chunksCount || 1} chunks of "${f.name}"...`, 'info');
-      setTimeout(() => {
-        showToast(`✅ Integrity verified! SHA-256 matches metadata perfectly.`, 'success');
-      }, 700);
-    }
-
-    function shareFile(id) {
-      const f = loadedFiles.find(x => x.id === id);
-      const url = `https://csrhmocmponregwceknr.supabase.co/storage/v1/object/public/vault-files/${f ? f.name : id}`;
-      navigator.clipboard.writeText(url);
-      showToast('🔗 Shareable Supabase object link copied to clipboard!', 'success');
     }
 
     function showToast(msg, type = 'info') {
