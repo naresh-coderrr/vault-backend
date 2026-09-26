@@ -4,6 +4,7 @@
   "description": "Vault Distributed Object Storage - Gateway API",
   "main": "server.js",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "node1": "node storage-node.js --port=9001 --dir=./node_data/node1 --name=Node-Alpha",
